@@ -48,13 +48,13 @@ local negative_slope = 0.2
 conv1 = nn.Sequential()
     :add(oc.OctreeConvolutionMM(2, num_features))
     :add(oc.OctreeGridPool2x2x2('max'))
-    :add(oc.OctreeReLU(true)) -- negative slope 0.2
+    :add(oc.OctreeLeakyReLU(negative_slope, true))
 -- 16x16x16
 conv2 = nn.Sequential()
     :add(oc.OctreeConvolutionMM(num_features, num_features * 2))
     :add(oc.OctreeGridPool2x2x2('max'))
     :add(oc.OctreeBatchNormalizationSS(num_features * 2))
-    :add(oc.OctreeReLU(true)) -- negative slope 0.2
+    :add(oc.OctreeLeakyReLU(negative_slope, true))
 -- 8x8x8
 conv3 = nn.Sequential()
     :add(oc.OctreeConvolutionMM(num_features * 2, num_features * 4))

@@ -73,6 +73,48 @@ void octree_relu_bwd_cpu(const octree* grid_in, const octree* grad_out, bool inp
 
 
 extern "C"
+void octree_leaky_relu_cpu(const octree* grid_in, float negative_slope, bool inplace, octree* grid_out) {
+  if(!inplace) {
+    octree_resize_as_cpu(grid_in, grid_out);
+    octree_cpy_scalars(grid_in, grid_out);
+    octree_cpy_trees_cpu_cpu(grid_in, grid_out);
+    octree_cpy_prefix_leafs_cpu_cpu(grid_in, grid_out);
+  }
+
+  ot_size_t feature_size = grid_in->feature_size;
+  #pragma omp parallel for
+  for(int vx_idx = 0; vx_idx < grid_in->n_leafs; ++vx_idx) {
+    for(int f = 0; f < feature_size; ++f) {
+      ot_data_t in_val = grid_in->data[vx_idx * feature_size + f];
+      grid_out->data[vx_idx * feature_size + f] = in_val <= 0 ? negative_slope*in_val : in_val;
+    }
+  }
+}
+
+
+extern "C"
+void octree_leaky_relu_bwd_cpu(const octree* grid_in, const octree* grad_out, float negative_slope, bool inplace, octree* grad_in) {
+  if(!inplace) {
+    octree_resize_as_cpu(grad_out, grad_in);
+    octree_cpy_scalars(grad_out, grad_in);
+    octree_cpy_trees_cpu_cpu(grad_out, grad_in);
+    octree_cpy_prefix_leafs_cpu_cpu(grad_out, grad_in);
+  }  
+  
+  ot_size_t feature_size = grid_in->feature_size;
+  #pragma omp parallel for
+  for(int vx_idx = 0; vx_idx < grad_out->n_leafs; ++vx_idx) {
+    for(int f = 0; f < feature_size; ++f) {
+      ot_data_t in_val = grid_in->data[vx_idx * feature_size + f];
+      ot_data_t grad_val = grad_out->data[vx_idx * feature_size + f];
+      grad_in->data[vx_idx * feature_size + f] = in_val <= 0 ? negative_slope : grad_val;
+    }
+  }
+}
+
+
+
+extern "C"
 void octree_sigmoid_cpu(const octree* in, bool inplace, octree* out) {
   if(!inplace) {
     octree_resize_as_cpu(in, out);

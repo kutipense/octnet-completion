@@ -33,6 +33,9 @@ extern "C" {
 void octree_relu_gpu(const octree* grid_in, bool inplace, octree* grid_out);
 void octree_relu_bwd_gpu(const octree* grid_in, const octree* grad_out, bool inplace, octree* grad_in);
 
+void octree_leaky_relu_gpu(const octree* grid_in, float negative_slope, bool inplace, octree* grid_out);
+void octree_leaky_relu_bwd_gpu(const octree* grid_in, const octree* grad_out, float negative_slope, bool inplace, octree* grad_in);
+
 void octree_sigmoid_gpu(const octree* in, bool inplace, octree* out);
 void octree_sigmoid_bwd_gpu(const octree* in, const octree* out, const octree* grad_out, bool inplace, octree* grad_in);
 
