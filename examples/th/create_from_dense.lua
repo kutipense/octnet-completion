@@ -1,7 +1,7 @@
 #!/usr/bin/env th
 -- Path to octnet module.
 -- Needs to be adapted depending on the installation directory!
-package.path = package.path .. ';/root/vol/octnet-batch-normalization/?/init.lua'
+package.path = package.path .. ';/root/vol/octnet-completion/th/?/init.lua'
 require('oc')
 
 
