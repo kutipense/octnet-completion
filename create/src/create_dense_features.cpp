@@ -26,6 +26,8 @@
 #include "octnet/create/create.h"
 #include "octnet/cpu/cpu.h"
 #include "octnet/cpu/combine.h"
+#include <math.h>
+#include <iostream>
 
 /// Create octrees from dense feature arrays, i.e. occupation is determined
 /// whether one of the features is different from zero and data is set to the features.
@@ -67,15 +69,20 @@ public:
       for(int h = h1; h < h2; ++h) {
         for(int w = w1; w < w2; ++w) {
           if(d >= 0 && h >= 0 && w >= 0 && d < depth && h < height && w < width) {
-            for (int f = 0; f < feature_size; ++f) {
+            // std::cout << "features: ";
+            bool isnumeric = true;
+            for (int f = 0; isnumeric && f < feature_size; ++f) {
               float val = data[((d*height + h)*width + w)*feature_size + f];
               
               // occupied if at least one of the features is significantly
               // different from zero.
-              if(val > epsilon || val < -epsilon) {
-                return true;
-              }
+              if(isinf(val)) isnumeric = false;
+
+              // if(val > epsilon || val < -epsilon) {
+              //   return true;
+              // }
             }
+            if(isnumeric) return true;
           }
         }
       }

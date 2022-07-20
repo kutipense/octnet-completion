@@ -141,8 +141,9 @@ shuffle = shuffle:long()
 local input = inputs:index(1, shuffle) -- Important for Octree conversion!
 local output = outputs:index(1, shuffle)
 local input_oc = oc.FloatOctree():octree_create_from_dense_features_batch(input)
+local output_oc = oc.FloatOctree():octree_create_from_dense_features_batch(output)
 input_oc = input_oc:cuda()
-output = output:cuda()
+output_oc = output_oc:cuda()
 print('input size:')
 print(input_oc:size())
 print('--------')
@@ -150,7 +151,8 @@ print('--------')
 local pred = model:forward(input_oc)
 print('output size:')
 print(pred:size())
-input_oc:write_to_bin("test.oc")
+print(input_oc:n_elems(), pred:n_elems(),output_oc:n_elems())
+output_oc:write_to_bin("test.oc")
 
 
 --- Definition of the objective on the current mini-batch.

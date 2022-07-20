@@ -36,13 +36,16 @@ local function read_file(file_name)
 end
 
 local function parse_sdf(input_sdf, tr_dist)
-    local sdf = torch.clamp(input_sdf, -tr_dist, tr_dist)
+    local sdf = input_sdf --torch.clamp(input_sdf, -tr_dist, tr_dist)
     return torch.cat(torch.abs(sdf), torch.sign(sdf), 4)
 
 end
 
 local function parse_df(input_df, tr_dist)
-    return torch.squeeze(torch.exp(torch.add(input_df, 1)),4)
+    print(input_df[1][1][1])
+    local tmp = torch.squeeze(torch.exp(torch.add(input_df, 1)),4)
+    print(tmp[1][1][1])
+    return tmp 
 end
 
 return {
