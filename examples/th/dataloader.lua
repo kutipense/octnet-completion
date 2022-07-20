@@ -34,10 +34,10 @@ end
 
 function DataLoader:getBatch()
     local bs = math.min(self.batch_size, self.n_samples - self.idx)
-    assert(bs > 0, "bs should be bigger than 0")
 
-    local sdf_batch = {}
-    local df_batch = {}
+    local sdf_batch = torch.Tensor(bs, 32, 32, 32, 2):zero()
+    local df_batch = torch.Tensor(bs, 32, 32, 32, 1)
+
     for batch_idx = 1, bs do
       local sdf_df_ids = {}
       self.idx = self.idx + 1
@@ -46,14 +46,16 @@ function DataLoader:getBatch()
         table.insert(sdf_df_ids, str)
       end
 
-      local sdf = f_ops.parse_sdf(f_ops.read_file(self.data_paths[1] .. "/" .. sdf_df_ids[1] .. ".sdf"), 0.1)
-      local df = f_ops.parse_df(f_ops.read_file(self.data_paths[2] .. "/" .. sdf_df_ids[2] .. ".df"), 0.1)
-      table.insert(sdf_batch, sdf)
-      table.insert(df_batch, df)
+      local sdf = f_ops.parse_sdf(f_ops.read_file(self.data_paths[1] .. "/" .. sdf_df_ids[1] .. ".sdf"))
+      local df = f_ops.parse_df(f_ops.read_file(self.data_paths[2] .. "/" .. sdf_df_ids[2] .. ".df"))
+      sdf_batch[batch_idx] = sdf
+      df_batch[batch_idx] = df:view(32, 32, 32, 1)
     end
 
     collectgarbage(); collectgarbage()
-
+    if self.n_samples - self.idx <= 0 then
+      self.idx = 0
+    end
     return sdf_batch, df_batch
 end
 

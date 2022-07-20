@@ -1,7 +1,7 @@
 #!/usr/bin/env th
 -- Path to octnet module.
 -- Needs to be adapted depending on the installation directory!
-package.path = package.path .. ';/root/vol/octnet-completion/th/?/init.lua'
+package.path = package.path .. ';/root/octnet/octnet-completion/th/oc/init.lua'
 require('nn')
 require('nngraph')
 require('torch')
@@ -120,13 +120,13 @@ model:cuda()
 -- Sample a random batch from the dataset.
 
 local opt = {}
-opt.batch_size = 2
+opt.batch_size = 16
 opt.data_paths = { 
     "/root/octnet/octnet-batch-normalization/benchmark/shapenet_dim32_sdf",
     "/root/octnet/octnet-batch-normalization/benchmark/shapenet_dim32_df" 
 }
 opt.full_batches = true
-opt.tr_dist = 0.1
+opt.tr_dist = 3
 opt.weightDecay = 0.0001
 opt.learningRate = 1e-3
 opt.n_epochs = 20
@@ -137,26 +137,26 @@ opt.net = model
 opt.criterion = oc.OctreeCrossEntropyCriterion() -- TODO implement SmoothL1 and L1
 opt.criterion:cuda()
 
--- train.worker(opt, inputs, outputs)
+train.worker(opt, inputs, outputs)
 
-local shuffle = torch.randperm(2)
-shuffle = shuffle:narrow(1, 1, opt.batch_size)
-shuffle = shuffle:long()
-shuffle = torch.LongTensor({1,2})
+-- local shuffle = torch.randperm(2)
+-- shuffle = shuffle:narrow(1, 1, opt.batch_size)
+-- shuffle = shuffle:long()
+-- shuffle = torch.LongTensor({1,2})
 
-local input = inputs:index(1, shuffle) -- Important for Octree conversion!
-local output = outputs:index(1, shuffle)
+-- local input = inputs:index(1, shuffle) -- Important for Octree conversion!
+-- local output = outputs:index(1, shuffle)
 
-local tr_dist = 3;
+-- local tr_dist = 3;
 
-local input_oc = oc.FloatOctree():octree_create_from_dense_features_batch(input)
-input_oc = input_oc:cuda()
-input_oc:clamp(tr_dist)
+-- local input_oc = oc.FloatOctree():octree_create_from_dense_features_batch(input)
+-- input_oc = input_oc:cuda()
+-- input_oc:clamp(tr_dist)
 
-local f = input_oc:float()
-local s = f:extract_n(1,2)
-local ss = f:extract_n(2,3)
-print(ss:max())
+-- local f = input_oc:float()
+-- local s = f:extract_n(1,2)
+-- local ss = f:extract_n(2,3)
+-- print(ss:max())
 -- ss:print()
 -- local output_oc = oc.FloatOctree():octree_create_from_dense_features_batch(output)
 -- input_oc = input_oc:cuda()

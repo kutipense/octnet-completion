@@ -6,8 +6,9 @@ function train_epoch(opt, inputs, outputs)
     local net = opt.net or error('no net in train_epoch')
     local criterion = opt.criterion or error('no criterion in train_epoch')
     local optimizer = opt.optimizer or error('no optimizer in train_epoch')
-    local data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "train", opt.tr_dist)
+    local data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit", opt.tr_dist)
     local n_batches = data_loader:n_batches() --data_loader:n_batches()
+    -- local n_batches = 5
   
     net:training()
   
@@ -18,11 +19,14 @@ function train_epoch(opt, inputs, outputs)
         grad_parameters:zero()
   
         local input, target = data_loader:getBatch()
-        print((batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size)
-        -- local input = inputs[{{(batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size},}]
+        -- print((batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size)
+        -- local input = input[{{(batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size},}]
         local input = oc.FloatOctree():octree_create_from_dense_features_batch(input)
         input = input:cuda()
-        -- local target = outputs[{{(batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size},}]
+        input:clamp(opt.tr_dist)
+
+        -- local target = target[{{(batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size},}]
+        -- print(target)
         local target = oc.FloatOctree():octree_create_from_dense_features_batch(target)
         target = target:cuda()
 
@@ -30,10 +34,9 @@ function train_epoch(opt, inputs, outputs)
         local f = criterion:forward(output, target)
         local dfdx = criterion:backward(output, target)
 
-        print(f)
 
         net:backward(input, dfdx)
-        
+
         if batch_idx < 129 or batch_idx % math.floor((n_batches / 200)) == 0 then 
           print(string.format('epoch=%2d | iter=%4d | loss=%9.6f ', opt.epoch, batch_idx, f))
         end
@@ -48,7 +51,6 @@ function train_epoch(opt, inputs, outputs)
   function test_epoch(opt, data_loader)
     local net = opt.net or error('no net in test_epoch')
     local criterion = opt.criterion or error('no criterion in test_epoch')
-    local n_batches = data_loader:n_batches()
     local data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit", opt.tr_dist)
     local n_batches = data_loader:n_batches() --data_loader:n_batches()
   
@@ -62,10 +64,15 @@ function train_epoch(opt, inputs, outputs)
   
       local timer = torch.Timer()
       local input, target = data_loader:getBatch()
+      local input = oc.FloatOctree():octree_create_from_dense_features_batch(input)
+      input = input:cuda()
+      input:clamp(opt.tr_dist)
       print(string.format('[INFO] loading data took %f[s] - n_batches %d', timer:time().real, target:size(1)))
   
       local timer = torch.Timer()
       local output = net:forward(input)
+      local target = oc.FloatOctree():octree_create_from_dense_features_batch(target)
+      target = target:cuda()
       output = output[{{1,target:size(1)}, {}}]
       local f = criterion:forward(output, target)
       print(string.format('[INFO] net/crtrn fwd took %f[s]', timer:time().real))
@@ -90,7 +97,7 @@ function worker(opt, inputs, outputs)
     local start_epoch = 1
 
     print(string.format('[INFO] start_epoch=%d', start_epoch))
-    for epoch = start_epoch, 1 do
+    for epoch = start_epoch, opt.n_epochs do
       opt.epoch = epoch
       
       -- clean up

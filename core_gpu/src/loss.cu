@@ -168,6 +168,127 @@ void octree_mse_loss_bwd_gpu(const octree* input, const octree* target, bool siz
 
 
 
+struct octree_mae_loss_from_leaf_idx : public thrust::unary_function<int, ot_data_t> {
+  const octree input;
+  const octree target;
+  
+  octree_mae_loss_from_leaf_idx(const octree input_, const octree target_) : 
+      input(input_), target(target_) {
+  }
+
+  __host__ __device__ ot_data_t operator()(const int leaf_idx) {
+    const int grid_idx = leaf_idx_to_grid_idx(&input, leaf_idx);
+    const ot_tree_t* tree = octree_get_tree(&input, grid_idx);
+
+    // const int cum_n_leafs = n_leafs_upto(&input, grid_idx);
+    const int cum_n_leafs = input.prefix_leafs[grid_idx];
+    const int data_idx = leaf_idx - cum_n_leafs;
+    const int bit_idx = data_idx_to_bit_idx(tree, data_idx);
+
+    // const ot_data_t* in = input.data_ptrs[grid_idx] + data_idx * input.feature_size;
+    const ot_data_t* in = octree_get_data(&input, grid_idx) + data_idx * input.feature_size;
+    // const ot_data_t* ta = target.data_ptrs[grid_idx] + data_idx * target.feature_size;
+    const ot_data_t* ta = octree_get_data(&target, grid_idx) + data_idx * target.feature_size;
+
+    const int depth = depth_from_bit_idx(bit_idx);
+    const ot_data_t vol = depth == 0 ? 512 : (depth == 1 ? 64 : (depth == 2 ? 8 : 1));
+
+    ot_data_t sum = 0;
+    for(int f = 0; f < input.feature_size; ++f) {
+      const ot_data_t z = in[f] - ta[f];
+      sum += vol * abs(z); // Take abs of z
+    }
+
+    return sum;
+  }
+};
+
+extern "C"
+ot_data_t octree_mae_loss_gpu(const octree* input, const octree* target, bool size_average, bool check) {
+  if(!octree_equal_shape(input, target)) {
+    printf("[ERROR] mae_loss - shape of inputs do not match\n");
+    exit(-1);
+  }
+  if(check && !octree_equal_trees_gpu(input, target)) {
+    printf("[ERROR] mae_loss - tree structure of inputs do not match\n");
+    exit(-1);
+  }
+
+  thrust::counting_iterator<int> iter(0);
+  ot_data_t output = thrust::transform_reduce(
+    thrust::device, iter, iter + input->n_leafs, 
+    octree_mae_loss_from_leaf_idx(*input, *target), ot_data_t(0), thrust::plus<ot_data_t>());
+
+  if(size_average) {
+    output = output / (octree_num_blocks(input) * input->feature_size * 8 * 8 * 8);
+  }
+  return output;
+}
+
+
+__global__ void kernel_mae_loss_bwd(octree grad, int n_leafs, const octree input, const octree target, const ot_data_t norm) {
+  
+  CUDA_KERNEL_LOOP(leaf_idx, n_leafs) {
+    const int grid_idx = grad.data[leaf_idx * grad.feature_size];
+    const ot_tree_t* tree = octree_get_tree(&grad, grid_idx);
+
+    // const int cum_n_leafs = n_leafs_upto(&grad, grid_idx);
+    const int cum_n_leafs = grad.prefix_leafs[grid_idx];
+    const int data_idx = leaf_idx - cum_n_leafs;
+    const int bit_idx = data_idx_to_bit_idx(tree, data_idx);
+
+    // ot_data_t* grad_data = grad.data_ptrs[grid_idx] + data_idx * grad.feature_size;
+    ot_data_t* grad_data = octree_get_data(&grad, grid_idx) + data_idx * grad.feature_size;
+    // ot_data_t* input_data = input.data_ptrs[grid_idx] + data_idx * input.feature_size;
+    ot_data_t* input_data = octree_get_data(&input, grid_idx) + data_idx * input.feature_size;
+    // ot_data_t* target_data = target.data_ptrs[grid_idx] + data_idx * target.feature_size;
+    ot_data_t* target_data = octree_get_data(&target, grid_idx) + data_idx * target.feature_size;
+
+    const int depth = depth_from_bit_idx(bit_idx);
+    const ot_data_t vol = depth == 0 ? 512 : (depth == 1 ? 64 : (depth == 2 ? 8 : 1));
+
+    for(int f = 0; f < input.feature_size; ++f) {
+      const ot_data_t z = input_data[f] - target_data[f];
+      grad_data[f] = vol * norm * z; // ?????
+    }
+  }
+}
+
+
+extern "C"
+void octree_mae_loss_bwd_gpu(const octree* input, const octree* target, bool size_average, bool check, octree* grad) {
+  if(!octree_equal_shape(input, target)) {
+    printf("[ERROR] mae_loss_bwd - shape of inputs do not match\n");
+    exit(-1);
+  }
+  if(check && !octree_equal_trees_gpu(input, target)) {
+    printf("[ERROR] mae_loss_bwd - tree structure of inputs do not match\n");
+    exit(-1);
+  }
+
+  octree_cpy_scalars(input, grad);
+  octree_resize_as_gpu(input, grad);
+  octree_cpy_trees_gpu_gpu(input, grad);
+  octree_cpy_prefix_leafs_gpu_gpu(input, grad);
+
+  ot_data_t norm = 2.0;
+  if(size_average) {
+    norm = norm / (octree_num_blocks(input) * input->feature_size * 8 * 8 * 8);
+  }
+  
+  octree_leaf_idx_to_grid_idx_gpu(grad, grad->feature_size, grad->data_capacity, grad->data);
+  kernel_mae_loss_bwd<<<GET_BLOCKS(grad->n_leafs), CUDA_NUM_THREADS>>>(
+      *grad, grad->n_leafs, *input, *target, norm
+  );
+  CUDA_POST_KERNEL_CHECK; 
+}
+
+
+
+
+
+
+
 struct octree_nll_loss_from_leaf_idx : public thrust::unary_function<int, float2> {
   const octree input;
   const octree target;
