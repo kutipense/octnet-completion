@@ -1,7 +1,7 @@
 #!/usr/bin/env th
 -- Path to octnet module.
 -- Needs to be adapted depending on the installation directory!
-package.path = package.path .. ';/root/vol/octnet-completion/th/?/init.lua'
+package.path = package.path .. ';/root/octnet/octnet-completion/th/oc/init.lua'
 require('nn')
 require('nngraph')
 require('torch')
@@ -17,16 +17,16 @@ local train = require('train')
 torch.setdefaulttensortype('torch.FloatTensor')
 
 function dataset(N)
-  local inputs = torch.Tensor(N, 32, 32, 32, 2):zero()
-  local outputs = torch.Tensor(N, 32, 32, 32, 1)
-  local f = f_ops.read_file("10155655850468db78d106ce0a280f87__0__.sdf")
-  local sdf_f = f_ops.parse_sdf(f, 0.1) 
-  local df_f = f_ops.parse_df(f, 0.1)
-  for i = 1, N do
-    inputs[i] = sdf_f
-    outputs[i] = df_f:view(32,32,32,1)
-  end
-  return inputs, outputs
+    local inputs = torch.Tensor(N, 32, 32, 32, 2):zero()
+    local outputs = torch.Tensor(N, 32, 32, 32, 1)
+    local f = f_ops.read_file("10155655850468db78d106ce0a280f87__0__.sdf")
+    local sdf_f = f_ops.parse_sdf(f, 0.1)
+    local df_f = f_ops.parse_df(f, 0.1)
+    for i = 1, N do
+        inputs[i] = sdf_f
+        outputs[i] = df_f:view(32, 32, 32, 1)
+    end
+    return inputs, outputs
 end
 
 -- Number of samples.
@@ -121,7 +121,12 @@ model:cuda()
 
 local opt = {}
 opt.batch_size = 2
-
+opt.data_paths = { 
+    "/root/octnet/octnet-batch-normalization/benchmark/shapenet_dim32_sdf",
+    "/root/octnet/octnet-batch-normalization/benchmark/shapenet_dim32_df" 
+}
+opt.full_batches = true
+opt.tr_dist = 0.1
 opt.weightDecay = 0.0001
 opt.learningRate = 1e-3
 opt.n_epochs = 20
@@ -153,47 +158,3 @@ print('output size:')
 print(pred:size())
 print(input_oc:n_elems(), pred:n_elems(),output_oc:n_elems())
 output_oc:write_to_bin("test.oc")
-
-
---- Definition of the objective on the current mini-batch.
--- This will be the objective fed to the optimization algorithm.
--- @param x input parameters
--- @return object value, gradients
-
---[[
-local feval = function(x)
-
-    -- Get new parameters.
-    if x ~= parameters then
-      parameters:copy(x)
-    end
-
-    -- Reset gradients
-    gradParameters:zero()
-  
-    -- Evaluate function on mini-batch.
-    local pred = model:forward(input_oc)
-    local f = criterion:forward(pred, output)
-  
-    -- Estimate df/dW.
-    local df_do = criterion:backward(pred, output)
-    model:backward(input, df_do)
-    print(pred:resize(1, batch_size))
-    print(output:resize(1, batch_size))
-    
-    -- return f and df/dX
-    return f, gradParameters
-end
-
-sgd_state = sgd_state or {
-    learningRate = learning_rate,
-    momentum = momentum,
-    learningRateDecay = 5e-7
-}
-
--- Returns the new parameters and the objective evaluated
--- before the update.
-p, f = optim.sgd(feval, parameters, sgd_state)
-
-print('['..t..']: '..f[1])
---]]
