@@ -16,15 +16,14 @@ end
 
 local DataLoader = torch.class('dataloader.DataLoader')
 
-function DataLoader:__init(data_paths, batch_size, full_batches, split, tr_dist)
+function DataLoader:__init(data_paths, batch_size, full_batches, split)
   assert(split == "val" or split == "overfit" or split == "train")
   self.split = split or error('')
   self.data_paths = data_paths or error('')
 
   self.batch_size = batch_size or error('')
   self.full_batches = full_batches or false
-  self.tr_dist = tr_dist or error('')
-  self.items = BuildArray(io.open(string.format("/root/octnet/octnet-batch-normalization/benchmark/shapenet/%s.txt", self.split)):lines())
+  self.items = BuildArray(io.open(string.format("/root/vol/octnet-completion/benchmark/%s.txt", self.split)):lines())
   self.n_samples = #self.items
   self.idx = 1
   assert(self.idx < self.n_samples, "idx should be smaller than the number of samples")
