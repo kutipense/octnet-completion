@@ -26,6 +26,7 @@
 #include "octnet/create/create.h"
 #include "octnet/cpu/cpu.h"
 #include "octnet/cpu/combine.h"
+#include "octnet/cpu/math.h"
 #include <math.h>
 #include <iostream>
 
@@ -76,7 +77,10 @@ public:
               
               // occupied if at least one of the features is significantly
               // different from zero.
-              if(isinf(val)) isnumeric = false;
+              if(isinf(val)){
+                isnumeric = false;
+              } 
+              // std::cout << val << std::endl;
 
               // if(val > epsilon || val < -epsilon) {
               //   return true;
@@ -108,9 +112,14 @@ public:
     int d = cz - vd/2.f;
     int h = cy - vh/2.f;
     int w = cx - vw/2.f;
-    
-    for (int f = 0; f < feature_size; ++f) {
-      dst[f] = data[((d*height + h)*width + w)*feature_size + f];
+    if(oc){
+      for (int f = 0; f < feature_size; ++f) {
+        dst[f] = data[((d*height + h)*width + w)*feature_size + f];
+      }
+    } else {
+      for (int f = 0; f < feature_size; ++f) {
+        dst[f] = 0;
+      }
     }
   }
 
@@ -128,9 +137,10 @@ octree* octree_create_from_dense_features_batch_cpu(const ot_data_t* data, int b
   // create individual octrees
   octree** octrees = new octree*[batch_size];
   for (int n = 0; n < batch_size; ++n) {
-    octrees[n] = octree_create_from_dense_features_cpu(data, depth, height, width, feature_size, fit, fit_multiply, pack, n_threads);
+    int offset = depth * height * width * feature_size * n;
+    octrees[n] = octree_create_from_dense_features_cpu(data + offset, depth, height, width, feature_size, fit, fit_multiply, pack, n_threads);
   }
-  
+
   // stack/combine octrees
   octree* ret = octree_new_cpu();
   octree_combine_n_cpu(octrees, batch_size, ret);

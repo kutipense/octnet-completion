@@ -35,16 +35,16 @@ local function read_file(file_name)
     return tensor_file
 end
 
-local function parse_sdf(input_sdf, tr_dist)
-    local sdf = input_sdf --torch.clamp(input_sdf, -tr_dist, tr_dist)
-    return torch.cat(torch.abs(sdf), torch.sign(sdf), 4)
+local function parse_sdf(input_sdf)
+    -- local sdf = torch.clamp(input_sdf, -tr_dist, tr_dist)
+    return torch.cat(torch.abs(input_sdf), torch.sign(input_sdf), 4)
 
 end
 
-local function parse_df(input_df, tr_dist)
-    print(input_df[1][1][1])
-    local tmp = torch.squeeze(torch.exp(torch.add(input_df, 1)),4)
-    print(tmp[1][1][1])
+local function parse_df(input_df)
+    -- print(input_df[1][1][1])
+    local tmp = torch.squeeze(input_df,4)
+    -- print(tmp[1][1][1])
     return tmp 
 end
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env th
 -- Path to octnet module.
 -- Needs to be adapted depending on the installation directory!
-package.path = package.path .. ';/root/octnet/octnet-completion/th/oc/init.lua'
+package.path = package.path .. ';/root/vol/octnet-completion/th/?/init.lua'
 require('nn')
 require('nngraph')
 require('torch')
@@ -20,8 +20,8 @@ function dataset(N)
     local inputs = torch.Tensor(N, 32, 32, 32, 2):zero()
     local outputs = torch.Tensor(N, 32, 32, 32, 1)
     local f = f_ops.read_file("10155655850468db78d106ce0a280f87__0__.sdf")
-    local sdf_f = f_ops.parse_sdf(f, 0.1)
-    local df_f = f_ops.parse_df(f, 0.1)
+    local sdf_f = f_ops.parse_sdf(f)
+    local df_f = f_ops.parse_df(f)
     for i = 1, N do
         inputs[i] = sdf_f
         outputs[i] = df_f:view(32, 32, 32, 1)
@@ -30,7 +30,7 @@ function dataset(N)
 end
 
 -- Number of samples.
-N = 2
+N = 10
 
 -- Inputs, outputs and ranges used for conversion.
 inputs, outputs = dataset(N)
@@ -139,22 +139,35 @@ opt.criterion:cuda()
 
 -- train.worker(opt, inputs, outputs)
 
-local shuffle = torch.randperm(N)
+local shuffle = torch.randperm(2)
 shuffle = shuffle:narrow(1, 1, opt.batch_size)
 shuffle = shuffle:long()
+shuffle = torch.LongTensor({1,2})
 
 local input = inputs:index(1, shuffle) -- Important for Octree conversion!
 local output = outputs:index(1, shuffle)
-local input_oc = oc.FloatOctree():octree_create_from_dense_features_batch(input)
-local output_oc = oc.FloatOctree():octree_create_from_dense_features_batch(output)
-input_oc = input_oc:cuda()
-output_oc = output_oc:cuda()
-print('input size:')
-print(input_oc:size())
-print('--------')
 
-local pred = model:forward(input_oc)
-print('output size:')
-print(pred:size())
-print(input_oc:n_elems(), pred:n_elems(),output_oc:n_elems())
-output_oc:write_to_bin("test.oc")
+local tr_dist = 3;
+
+local input_oc = oc.FloatOctree():octree_create_from_dense_features_batch(input)
+input_oc = input_oc:cuda()
+input_oc:clamp(tr_dist)
+
+local f = input_oc:float()
+local s = f:extract_n(1,2)
+local ss = f:extract_n(2,3)
+print(ss:max())
+-- ss:print()
+-- local output_oc = oc.FloatOctree():octree_create_from_dense_features_batch(output)
+-- input_oc = input_oc:cuda()
+-- output_oc = output_oc:cuda()
+-- print('input size:')
+-- print(input_oc:size())
+-- -- print('--------')
+
+-- local pred = model:forward(input_oc)
+-- print('output size:')
+-- print(pred:size())
+-- print(input_oc:n_elems(), pred:n_elems(),output_oc:n_elems())
+ss:write_to_bin("test.oc")
+

@@ -408,7 +408,10 @@ function CudaOctree:float(other)
   return grid
 end 
 
-
+function CudaOctree:clamp(tr_dist)
+  oc.gpu.octree_clamp_gpu(self.grid, tr_dist)
+  return self
+end
 
 
 function Octree:read_from_bin(path)

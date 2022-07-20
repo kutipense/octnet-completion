@@ -99,6 +99,21 @@ void octree_scalar_add_gpu(octree* grid, const ot_data_t scalar) {
   CUDA_POST_KERNEL_CHECK;
 }
 
+__global__ void kernel_clamp(ot_data_t* data, int N, const ot_data_t tr_dist) {
+  CUDA_KERNEL_LOOP(idx, N) {
+    if(data[idx] < -tr_dist) data[idx] = -tr_dist;
+    else if(data[idx] > tr_dist) data[idx] = tr_dist;
+  }
+}
+
+extern "C"
+void octree_clamp_gpu(octree* grid, const ot_data_t tr_dist) {
+  int n = grid->n_leafs * grid->feature_size;
+  kernel_clamp<<<GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
+      grid->data, n, tr_dist
+  );
+  CUDA_POST_KERNEL_CHECK;
+}
 
 
 
