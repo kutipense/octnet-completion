@@ -38,9 +38,9 @@ function OctreeLeakyReLU:updateOutput(input)
   end
 
   if input._type == 'oc_float' then
-    oc.cpu.octree_leaky_relu_cpu(input.grid, self.inplace, self.output.grid)
+    oc.cpu.octree_leaky_relu_cpu(input.grid, self.negative_slope, self.inplace, self.output.grid)
   elseif input._type == 'oc_cuda' then
-    oc.gpu.octree_leaky_relu_gpu(input.grid, self.inplace, self.output.grid)
+    oc.gpu.octree_leaky_relu_gpu(input.grid, self.negative_slope, self.inplace, self.output.grid)
   end
 
   return self.output 
@@ -52,9 +52,9 @@ function OctreeLeakyReLU:updateGradInput(input, gradOutput)
   end 
 
   if input._type == 'oc_float' then
-    oc.cpu.octree_leaky_relu_bwd_cpu(input.grid, gradOutput.grid, self.inplace, self.gradInput.grid)
+    oc.cpu.octree_leaky_relu_bwd_cpu(input.grid, gradOutput.grid, self.negative_slope, self.inplace, self.gradInput.grid)
   elseif input._type == 'oc_cuda' then
-    oc.gpu.octree_leaky_relu_bwd_gpu(input.grid, gradOutput.grid, self.inplace, self.gradInput.grid)
+    oc.gpu.octree_leaky_relu_bwd_gpu(input.grid, gradOutput.grid, self.negative_slope, self.inplace, self.gradInput.grid)
   end
 
   return self.gradInput  

@@ -12,34 +12,28 @@ require('cunn') -- require before oc!
 require('oc')
 
 local f_ops = require('f_ops')
+local train = require('train')
 
--- http://jucor.github.io/torch-doc-template/tensor.html
 torch.setdefaulttensortype('torch.FloatTensor')
 
---- Creating a 16x16x16 dataset containing cubes at different positions.
--- The task is to classify whether the cube is in the upper or the
--- lower half.
--- @param N dataset size
 function dataset(N)
   local inputs = torch.Tensor(N, 32, 32, 32, 2):zero()
-  local outputs = torch.Tensor(N, 32, 32, 32)
+  local outputs = torch.Tensor(N, 32, 32, 32, 1)
   local f = f_ops.read_file("10155655850468db78d106ce0a280f87__0__.sdf")
   local sdf_f = f_ops.parse_sdf(f, 0.1) 
   local df_f = f_ops.parse_df(f, 0.1)
   for i = 1, N do
     inputs[i] = sdf_f
-    outputs[i] = df_f
+    outputs[i] = df_f:view(32,32,32,1)
   end
   return inputs, outputs
 end
 
 -- Number of samples.
-N = 10
+N = 2
 
 -- Inputs, outputs and ranges used for conversion.
 inputs, outputs = dataset(N)
-
-print(inputs:size(), outputs:size())
 
 local num_features = 80
 local negative_slope = 0.2
@@ -73,7 +67,7 @@ bottleneck = nn.Sequential()
     :add(nn.ReLU(true))
     :add(nn.Linear(num_features * 8, num_features * 8))
     :add(nn.ReLU(true))
-    :add(nn.View(1, num_features * 8, 1, 1, 1))
+    :add(nn.View(num_features * 8, 1, 1, 1))
 -- 1x1x1
 deconv1 = nn.Sequential()
     :add(cudnn.VolumetricFullConvolution(num_features * 16, num_features * 4, 4, 4, 4, 1, 1, 1, 0, 0, 0))
@@ -124,15 +118,28 @@ model:cuda()
 -- graph.dot(m.bg, 'Backward Graph', 'bg')
 
 -- Sample a random batch from the dataset.
-local batch_size = 1
-local shuffle = torch.randperm(N)
-shuffle = shuffle:narrow(1, 1, batch_size)
-shuffle = shuffle:long()
 
+local opt = {}
+opt.batch_size = 2
+
+opt.weightDecay = 0.0001
+opt.learningRate = 1e-3
+opt.n_epochs = 20
+opt.learningRate_steps = {}
+opt.learningRate_steps[15] = 0.1
+opt.optimizer = optim['adam']
+opt.net = model
+opt.criterion = oc.OctreeCrossEntropyCriterion() -- TODO implement SmoothL1 and L1
+opt.criterion:cuda()
+
+-- train.worker(opt, inputs, outputs)
+
+local shuffle = torch.randperm(N)
+shuffle = shuffle:narrow(1, 1, opt.batch_size)
+shuffle = shuffle:long()
 
 local input = inputs:index(1, shuffle) -- Important for Octree conversion!
 local output = outputs:index(1, shuffle)
-
 local input_oc = oc.FloatOctree():octree_create_from_dense_features_batch(input)
 input_oc = input_oc:cuda()
 output = output:cuda()
@@ -143,6 +150,7 @@ print('--------')
 local pred = model:forward(input_oc)
 print('output size:')
 print(pred:size())
+input_oc:write_to_bin("test.oc")
 
 
 --- Definition of the objective on the current mini-batch.
