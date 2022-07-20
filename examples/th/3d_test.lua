@@ -1,7 +1,7 @@
 #!/usr/bin/env th
 -- Path to octnet module.
 -- Needs to be adapted depending on the installation directory!
-package.path = package.path .. ';/root/vol/octnet-completion/th/?/init.lua'
+package.path = package.path .. ';/root/octnet/octnet-completion/th/oc/init.lua'
 require('nn')
 require('nngraph')
 require('torch')
@@ -17,16 +17,16 @@ local train = require('train')
 torch.setdefaulttensortype('torch.FloatTensor')
 
 function dataset(N)
-  local inputs = torch.Tensor(N, 32, 32, 32, 2):zero()
-  local outputs = torch.Tensor(N, 32, 32, 32, 1)
-  local f = f_ops.read_file("10155655850468db78d106ce0a280f87__0__.sdf")
-  local sdf_f = f_ops.parse_sdf(f, 0.1) 
-  local df_f = f_ops.parse_df(f, 0.1)
-  for i = 1, N do
-    inputs[i] = sdf_f
-    outputs[i] = df_f:view(32,32,32,1)
-  end
-  return inputs, outputs
+    local inputs = torch.Tensor(N, 32, 32, 32, 2):zero()
+    local outputs = torch.Tensor(N, 32, 32, 32, 1)
+    local f = f_ops.read_file("10155655850468db78d106ce0a280f87__0__.sdf")
+    local sdf_f = f_ops.parse_sdf(f, 0.1)
+    local df_f = f_ops.parse_df(f, 0.1)
+    for i = 1, N do
+        inputs[i] = sdf_f
+        outputs[i] = df_f:view(32, 32, 32, 1)
+    end
+    return inputs, outputs
 end
 
 -- Number of samples.
@@ -131,26 +131,31 @@ opt.optimizer = optim['adam']
 opt.net = model
 opt.criterion = oc.OctreeCrossEntropyCriterion() -- TODO implement SmoothL1 and L1
 opt.criterion:cuda()
+opt.batch_size = 2
+opt.data_paths = { "/root/octnet/octnet-batch-normalization/benchmark/shapenet_dim32_sdf",
+    "/root/octnet/octnet-batch-normalization/benchmark/shapenet_dim32_df" }
+opt.full_batches = true
+opt.tr_dist = 0.1
 
--- train.worker(opt, inputs, outputs)
+train.worker(opt, inputs, outputs)
 
-local shuffle = torch.randperm(N)
-shuffle = shuffle:narrow(1, 1, opt.batch_size)
-shuffle = shuffle:long()
+-- local shuffle = torch.randperm(N)
+-- shuffle = shuffle:narrow(1, 1, opt.batch_size)
+-- shuffle = shuffle:long()
 
-local input = inputs:index(1, shuffle) -- Important for Octree conversion!
-local output = outputs:index(1, shuffle)
-local input_oc = oc.FloatOctree():octree_create_from_dense_features_batch(input)
-input_oc = input_oc:cuda()
-output = output:cuda()
-print('input size:')
-print(input_oc:size())
-print('--------')
+-- local input = inputs:index(1, shuffle) -- Important for Octree conversion!
+-- local output = outputs:index(1, shuffle)
+-- local input_oc = oc.FloatOctree():octree_create_from_dense_features_batch(input)
+-- input_oc = input_oc:cuda()
+-- output = output:cuda()
+-- print('input size:')
+-- print(input_oc:size())
+-- print('--------')
 
-local pred = model:forward(input_oc)
-print('output size:')
-print(pred:size())
-input_oc:write_to_bin("test.oc")
+-- local pred = model:forward(input_oc)
+-- print('output size:')
+-- print(pred:size())
+-- input_oc:write_to_bin("test.oc")
 
 
 --- Definition of the objective on the current mini-batch.

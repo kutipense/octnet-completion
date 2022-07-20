@@ -1,10 +1,13 @@
 #!/usr/bin/env th
 
+local dataloader = require('dataloader')
+
 function train_epoch(opt, inputs, outputs)
     local net = opt.net or error('no net in train_epoch')
     local criterion = opt.criterion or error('no criterion in train_epoch')
     local optimizer = opt.optimizer or error('no optimizer in train_epoch')
-    local n_batches = 1 --data_loader:n_batches()
+    local data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "train", opt.tr_dist)
+    local n_batches = data_loader:n_batches() --data_loader:n_batches()
   
     net:training()
   
@@ -14,12 +17,12 @@ function train_epoch(opt, inputs, outputs)
         if x ~= parameters then parameters:copy(x) end
         grad_parameters:zero()
   
-        -- local input, target = data_loader:getBatch()
-        -- print((batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size)
-        local input = inputs[{{(batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size},}]
+        local input, target = data_loader:getBatch()
+        print((batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size)
+        -- local input = inputs[{{(batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size},}]
         local input = oc.FloatOctree():octree_create_from_dense_features_batch(input)
         input = input:cuda()
-        local target = outputs[{{(batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size},}]
+        -- local target = outputs[{{(batch_idx-1)*opt.batch_size+1,batch_idx*opt.batch_size},}]
         local target = oc.FloatOctree():octree_create_from_dense_features_batch(target)
         target = target:cuda()
 
@@ -46,6 +49,8 @@ function train_epoch(opt, inputs, outputs)
     local net = opt.net or error('no net in test_epoch')
     local criterion = opt.criterion or error('no criterion in test_epoch')
     local n_batches = data_loader:n_batches()
+    local data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit", opt.tr_dist)
+    local n_batches = data_loader:n_batches() --data_loader:n_batches()
   
     net:evaluate()
   
