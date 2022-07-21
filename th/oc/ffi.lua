@@ -321,10 +321,14 @@ void octree_sigmoid_bwd_gpu(const octree* in, const octree* out, const octree* g
 void octree_logsoftmax_gpu(const octree* in, octree* out);
 void octree_logsoftmax_bwd_gpu(const octree* in, const octree* out, const octree* grad_out, octree* grad_in);
 
+void octree_log_scale_gpu(const octree* in, bool inplace, octree* out);
+void octree_log_scale_bwd_gpu(const octree* in, const octree* out, const octree* grad_out, bool inplace, octree* grad_in);
+
 void octree_add_gpu(const octree* in1, ot_data_t fac1, const octree* in2, ot_data_t fac2, bool check, octree* out);
 void octree_scalar_mul_gpu(octree* grid, const ot_data_t scalar);
 void octree_scalar_add_gpu(octree* grid, const ot_data_t scalar);
 void octree_clamp_gpu(octree* grid, const ot_data_t tr_dist);
+void octree_log_scale_op_gpu(octree* grid);
 ot_data_t octree_min_gpu(const octree* grid_in);
 ot_data_t octree_max_gpu(const octree* grid_in);
 

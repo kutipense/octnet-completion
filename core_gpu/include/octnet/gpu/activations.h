@@ -41,6 +41,9 @@ void octree_sigmoid_bwd_gpu(const octree* in, const octree* out, const octree* g
 
 void octree_logsoftmax_gpu(const octree* in, octree* out);
 void octree_logsoftmax_bwd_gpu(const octree* in, const octree* out, const octree* grad_out, octree* grad_in);
+
+void octree_log_scale_gpu(const octree* in, bool inplace, octree* out);
+void octree_log_scale_bwd_gpu(const octree* in, const octree* out, const octree* grad_out, bool inplace, octree* grad_in);
 } //extern "C"
 
 

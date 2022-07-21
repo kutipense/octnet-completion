@@ -18,7 +18,10 @@ function train_epoch(opt, data_loader)
       local input, target = data_loader:getBatch()
       local input = oc.FloatOctree():octree_create_from_dense_features_batch(input):cuda()
       local target = oc.FloatOctree():octree_create_from_dense_features_batch(target):cuda()
+      
       input:clamp(opt.tr_dist)
+      target:clamp(opt.tr_dist)
+      target:log_scale()
 
       local output = net:forward(input)
       local f = criterion:forward(output, target)
@@ -116,16 +119,18 @@ function worker(opt, train_data_loader, test_data_loader)
 
     -- save network
     print('[INFO] saving progress')
-    local net_path = string.format('models/net_epoch%03d.t7', opt.epoch) --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
-    torch.save(net_path, opt.net:clearState())
-
-    -- save state
-    local state_path = 'models/state.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
-    if not opt.state_save_interval or opt.epoch % opt.state_save_interval == 0 then
-      opt.net = opt.net:clearState()
-      torch.save(state_path, opt)
+    if epoch % 10 == 0 then
+      local net_path = string.format('models/net_epoch%03d.t7', opt.epoch) --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
+      torch.save(net_path, opt.net:clearState())
+  
+      -- save state
+      local state_path = 'models/state.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
+      if not opt.state_save_interval or opt.epoch % opt.state_save_interval == 0 then
+        opt.net = opt.net:clearState()
+        torch.save(state_path, opt)
+      end
+      print('[INFO] progress saved to: ' .. net_path)
     end
-    print('[INFO] progress saved to: ' .. net_path)
 
     -- clean up
     collectgarbage('collect')

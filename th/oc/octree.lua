@@ -413,6 +413,11 @@ function CudaOctree:clamp(tr_dist)
   return self
 end
 
+function CudaOctree:log_scale()
+  oc.gpu.octree_log_scale_op_gpu(self.grid)
+  return self
+end
+
 
 function Octree:read_from_bin(path)
   oc.cpu.octree_read_cpu(path, self.grid)

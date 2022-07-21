@@ -261,3 +261,59 @@ void octree_logsoftmax_bwd_gpu(const octree* in, const octree* out, const octree
   );
   CUDA_POST_KERNEL_CHECK;
 }
+
+
+
+
+
+__global__ void kernel_log_scale(ot_data_t* out, int n_data, const ot_data_t* in) {
+  CUDA_KERNEL_LOOP(data_idx, n_data) {
+    ot_data_t in_val = in[data_idx];
+    out[data_idx] = log(abs(in_val) + 1.0f);
+  }
+}
+
+void octree_log_scale_gpu(const octree* in, bool inplace, octree* out) {
+  if(DEBUG) { printf("[DEBUG] octree_log_scale_gpu\n"); }
+
+  if(!inplace) {
+    octree_resize_as_gpu(in, out);
+    octree_cpy_scalars(in, out);
+    octree_cpy_trees_gpu_gpu(in, out);
+    octree_cpy_prefix_leafs_gpu_gpu(in, out);
+  }
+
+  int n_data = in->n_leafs * in->feature_size;
+  kernel_log_scale<<<GET_BLOCKS(n_data), CUDA_NUM_THREADS>>>(
+      out->data, n_data, in->data
+  );
+  CUDA_POST_KERNEL_CHECK;
+}
+
+
+
+__global__ void kernel_log_scale_bwd(ot_data_t* grad_in, int n_data, const ot_data_t* in, const ot_data_t* out, const ot_data_t* grad_out) {
+  CUDA_KERNEL_LOOP(data_idx, n_data) {
+    ot_data_t out_val = out[data_idx];
+    ot_data_t abs_out_val = abs(out_val);
+    ot_data_t grad_val = grad_out[data_idx];
+    grad_in[data_idx] = grad_val * out_val / (abs_out_val * (abs_out_val + 1));
+  }
+}
+
+void octree_log_scale_bwd_gpu(const octree* in, const octree* out, const octree* grad_out, bool inplace, octree* grad_in) {
+  if(DEBUG) { printf("[DEBUG] octree_log_scale_bwd_gpu\n"); }
+
+  if(!inplace) {
+    octree_resize_as_gpu(grad_out, grad_in);
+    octree_cpy_scalars(grad_out, grad_in);
+    octree_cpy_trees_gpu_gpu(grad_out, grad_in);
+    octree_cpy_prefix_leafs_gpu_gpu(grad_out, grad_in);
+  }
+
+  int n_data = in->n_leafs * in->feature_size;
+  kernel_log_scale_bwd<<<GET_BLOCKS(n_data), CUDA_NUM_THREADS>>>(
+      grad_in->data, n_data, in->data, out->data, grad_out->data
+  );
+  CUDA_POST_KERNEL_CHECK;
+}

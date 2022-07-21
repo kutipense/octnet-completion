@@ -40,6 +40,7 @@ void octree_clamp_gpu(octree* grid, const ot_data_t tr_dist);
 ot_data_t octree_min_gpu(const octree* grid_in);
 ot_data_t octree_max_gpu(const octree* grid_in);
 
+void octree_log_scale_op_gpu(octree* grid);
 }
 
 #endif 

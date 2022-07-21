@@ -64,8 +64,7 @@ local function create_model(opt)
     deconv4 = nn.Sequential()
         :add(oc.OctreeGridUnpool2x2x2('max'))
         :add(oc.OctreeConvolutionMM(num_features * 2, 1))
-        :add(oc.OctreeBatchNormalizationSS(1))
-        :add(oc.OctreeReLU(true))
+        :add(oc.OctreeLogScale(false))
     --32x32x32
 
     local vol = -nn.Identity()

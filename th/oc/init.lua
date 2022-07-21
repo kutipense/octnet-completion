@@ -50,6 +50,7 @@ include('OctreeReLU.lua')
 include('OctreeLeakyReLU.lua')
 include('OctreeSigmoid.lua')
 include('OctreeLogSoftMax.lua')
+include('OctreeLogScale.lua')
 include('OctreeSplit.lua')
 
 include('OctreeMSECriterion.lua')

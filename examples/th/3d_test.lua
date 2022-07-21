@@ -15,7 +15,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 
 
 local opt = {}
-opt.batch_size = 4
+opt.batch_size = 16
 opt.data_paths = { 
     "/root/vol/octnet-completion/benchmark/sdf",
     "/root/vol/octnet-completion/benchmark/df" 
@@ -26,8 +26,8 @@ opt.num_features = 80
 opt.full_batches = true
 opt.tr_dist = 3
 opt.weightDecay = 0.0001
-opt.learningRate = 1e-3
-opt.n_epochs = 20
+opt.learningRate = 1e-4
+opt.n_epochs = 250
 opt.learningRate_steps = {}
 opt.learningRate_steps[15] = 0.1
 opt.optimizer = optim['adam']
