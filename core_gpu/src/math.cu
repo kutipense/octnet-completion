@@ -135,7 +135,7 @@ ot_data_t octree_max_gpu(const octree* grid_in) {
   return max_h;
 }
 
-__global__ void kernel_log_scale(ot_data_t* data, int N) {
+__global__ void kernel_log_scale_op(ot_data_t* data, int N) {
   CUDA_KERNEL_LOOP(idx, N) {
     data[idx] = log(abs(data[idx]) + 1.0f);
   }
@@ -144,7 +144,22 @@ __global__ void kernel_log_scale(ot_data_t* data, int N) {
 extern "C"
 void octree_log_scale_op_gpu(octree* grid) {
   int n = grid->n_leafs * grid->feature_size;
-  kernel_log_scale<<<GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
+  kernel_log_scale_op<<<GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
+      grid->data, n
+  );
+  CUDA_POST_KERNEL_CHECK;
+}
+
+__global__ void kernel_log_scale_op_inv(ot_data_t* data, int N) {
+  CUDA_KERNEL_LOOP(idx, N) {
+    data[idx] = expf(data[idx]) - 1.0f;
+  }
+}
+
+extern "C"
+void octree_log_scale_inv_op_gpu(octree* grid) {
+  int n = grid->n_leafs * grid->feature_size;
+  kernel_log_scale_op_inv<<<GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
       grid->data, n
   );
   CUDA_POST_KERNEL_CHECK;

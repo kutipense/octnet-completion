@@ -37,12 +37,12 @@ local function create_model(opt)
         :add(nn.LeakyReLU(negative_slope, true))
     -- 1x1x1
     bottleneck = nn.Sequential()
-        :add(nn.View(num_features * 8))
+        :add(nn.Reshape(num_features * 8, true))
         :add(nn.Linear(num_features * 8, num_features * 8))
         :add(nn.ReLU(true))
         :add(nn.Linear(num_features * 8, num_features * 8))
         :add(nn.ReLU(true))
-        :add(nn.View(num_features * 8, 1, 1, 1))
+        :add(nn.Reshape(num_features * 8, 1, 1, 1))
     -- 1x1x1
     deconv1 = nn.Sequential()
         :add(cudnn.VolumetricFullConvolution(num_features * 16, num_features * 4, 4, 4, 4, 1, 1, 1, 0, 0, 0))
@@ -56,13 +56,13 @@ local function create_model(opt)
         :add(oc.CDHWToOctree(conv3:get(2))) --return from dense
     --8x8x8
     deconv3 = nn.Sequential()
-        :add(oc.OctreeGridUnpool2x2x2('max'))
+        :add(oc.OctreeGridUnpoolGuided2x2x2(conv2:get(1)))
         :add(oc.OctreeConvolutionMM(num_features * 4, num_features))
         :add(oc.OctreeBatchNormalizationSS(num_features))
         :add(oc.OctreeReLU(true))
     --16x16x16
     deconv4 = nn.Sequential()
-        :add(oc.OctreeGridUnpool2x2x2('max'))
+        :add(oc.OctreeGridUnpoolGuided2x2x2(conv1:get(1)))
         :add(oc.OctreeConvolutionMM(num_features * 2, 1))
         :add(oc.OctreeLogScale(false))
     --32x32x32

@@ -418,6 +418,11 @@ function CudaOctree:log_scale()
   return self
 end
 
+function CudaOctree:log_scale_inv()
+  oc.gpu.octree_log_scale_inv_op_gpu(self.grid)
+  return self
+end
+
 
 function Octree:read_from_bin(path)
   oc.cpu.octree_read_cpu(path, self.grid)

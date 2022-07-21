@@ -15,7 +15,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 
 
 local opt = {}
-opt.batch_size = 16
+opt.batch_size = 1
 opt.data_paths = { 
     "/root/vol/octnet-completion/benchmark/sdf",
     "/root/vol/octnet-completion/benchmark/df" 
@@ -26,7 +26,7 @@ opt.num_features = 80
 opt.full_batches = true
 opt.tr_dist = 3
 opt.weightDecay = 0.0001
-opt.learningRate = 1e-4
+opt.learningRate = 1e-4 * 5
 opt.n_epochs = 250
 opt.learningRate_steps = {}
 opt.learningRate_steps[15] = 0.1
@@ -41,9 +41,22 @@ opt.net = completion_model.create_model(opt)
 local train_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit")
 local test_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit")
 
--- local input, target = train_data_loader:getBatch()
--- local input = oc.FloatOctree():octree_create_from_dense_features_batch(input):cuda()
--- print(input:grid_depth())
+local input, target = train_data_loader:getBatch()
+local input = oc.FloatOctree():octree_create_from_dense_features_batch(input):cuda()
+local target = oc.FloatOctree():octree_create_from_dense_features_batch(target):cuda()
+
+-- input:clamp(opt.tr_dist)
+-- model = torch.load('models/best.t7')
+-- model:evaluate()
+-- -- print(input:size())
+-- output = model:forward(input)
+-- output:log_scale_inv()
+
+-- -- output:float():print()
+-- target:float():print()
+-- input:write_to_bin('input.oc')
+-- output:write_to_bin('output.oc')
+
 train.worker(opt, train_data_loader, test_data_loader)
 
 -- local shuffle = torch.randperm(2)
