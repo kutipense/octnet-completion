@@ -15,7 +15,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 
 
 local opt = {}
-opt.batch_size = 16
+opt.batch_size = 4
 opt.data_paths = { 
     "/root/vol/octnet-completion/benchmark/sdf",
     "/root/vol/octnet-completion/benchmark/df" 
@@ -31,7 +31,7 @@ opt.n_epochs = 20
 opt.learningRate_steps = {}
 opt.learningRate_steps[15] = 0.1
 opt.optimizer = optim['adam']
-opt.criterion = oc.OctreeCrossEntropyCriterion() -- TODO implement SmoothL1 and L1
+opt.criterion = oc.OctreeSmoothMAECriterion() -- TODO implement SmoothL1 and L1
 opt.criterion:cuda()
 
 -- create model
@@ -41,6 +41,9 @@ opt.net = completion_model.create_model(opt)
 local train_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit")
 local test_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit")
 
+-- local input, target = train_data_loader:getBatch()
+-- local input = oc.FloatOctree():octree_create_from_dense_features_batch(input):cuda()
+-- print(input:grid_depth())
 train.worker(opt, train_data_loader, test_data_loader)
 
 -- local shuffle = torch.randperm(2)

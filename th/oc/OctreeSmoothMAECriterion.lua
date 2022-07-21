@@ -23,35 +23,34 @@
 -- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 -- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-local OctreeMAECriterion, parent = torch.class('oc.OctreeMAECriterion', 'oc.OctreeCriterion')
+local OctreeSmoothMAECriterion, parent = torch.class('oc.OctreeSmoothMAECriterion', 'oc.OctreeCriterion')
 
-function OctreeMAECriterion:__init(size_average, check)
+function OctreeSmoothMAECriterion:__init(beta)
   parent.__init(self)
 
   if size_average ~= nil then
-    self.size_average = size_average
+    self.beta = beta
   else
-    self.size_average = true
+    self.beta = 1.0
   end
-  self.check = check or false
 end
 
-function OctreeMAECriterion:updateOutput(input, target)
+function OctreeSmoothMAECriterion:updateOutput(input, target)
   self.output = -1
   if input._type == 'oc_float' then
-    self.output = oc.cpu.octree_mae_loss_cpu(input.grid, target.grid, self.size_average, self.check)
+    self.output = oc.cpu.octree_smooth_mae_loss_cpu(input.grid, target.grid, self.beta)
   elseif input._type == 'oc_cuda' then
-    self.output = oc.gpu.octree_mae_loss_gpu(input.grid, target.grid, self.size_average, self.check)
+    self.output = oc.gpu.octree_smooth_mae_loss_gpu(input.grid, target.grid, self.beta)
   end
 
   return self.output
 end 
 
-function OctreeMAECriterion:updateGradInput(input, target)
+function OctreeSmoothMAECriterion:updateGradInput(input, target)
   if input._type == 'oc_float' then
-    oc.cpu.octree_mae_loss_bwd_cpu(input.grid, target.grid, self.size_average, self.check, self.gradInput.grid)
+    oc.cpu.octree_smooth_mae_loss_bwd_cpu(input.grid, target.grid, self.beta, self.gradInput.grid)
   elseif input._type == 'oc_cuda' then
-    oc.gpu.octree_mae_loss_bwd_gpu(input.grid, target.grid, self.size_average, self.check, self.gradInput.grid)
+    oc.gpu.octree_smooth_mae_loss_bwd_gpu(input.grid, target.grid, self.beta, self.gradInput.grid)
   end
 
   return self.gradInput

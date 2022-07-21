@@ -33,6 +33,9 @@ extern "C" {
 ot_data_t octree_mse_loss_gpu(const octree* input, const octree* target, bool size_average, bool check);
 void octree_mse_loss_bwd_gpu(const octree* input, const octree* target, bool size_average, bool check, octree* grad);
 
+ot_data_t octree_smooth_mae_loss_gpu(const octree* input, const octree* target, ot_data_t beta);
+void octree_smooth_mae_loss_bwd_gpu(const octree* input, const octree* target, ot_data_t beta, octree* grad);
+
 void octree_nll_loss_gpu(const octree* input, const octree* target, const ot_data_t* weights, int class_base, bool size_average, bool check, ot_data_t* output, ot_data_t* total_weight);
 void octree_nll_loss_bwd_gpu(const octree* input, const octree* target, const ot_data_t* weights, const ot_data_t total_weight, int class_base, bool size_average, bool check, octree* grad);
 

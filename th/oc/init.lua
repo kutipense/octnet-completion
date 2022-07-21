@@ -53,6 +53,7 @@ include('OctreeLogSoftMax.lua')
 include('OctreeSplit.lua')
 
 include('OctreeMSECriterion.lua')
+include('OctreeSmoothMAECriterion.lua')
 include('OctreeClassNLLCriterion.lua')
 include('OctreeCrossEntropyCriterion.lua')
 include('OctreeBCECriterion.lua')

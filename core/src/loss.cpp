@@ -190,6 +190,140 @@ void octree_mse_loss_bwd_cpu(const octree* input, const octree* target, bool siz
   }
 }
 
+extern "C"
+ot_data_t octree_smooth_mae_loss_cpu(const octree* input, const octree* target, ot_data_t beta) {
+  auto loss_fn = [beta](ot_data_t x, ot_data_t y) {
+    auto l = std::abs(x - y);
+    if (l<beta) return 0.5*l*l/beta;
+    return l-0.5*beta;
+  };
+
+  const int n_blocks = octree_num_blocks(input);
+  const int feature_size = input->feature_size;
+
+  ot_data_t output = 0;
+
+  #pragma omp parallel for
+  for(int grid_idx = 0; grid_idx < n_blocks; ++grid_idx) {
+    const ot_tree_t* tree = octree_get_tree(input, grid_idx);
+    // const ot_data_t* data_in = input->data_ptrs[grid_idx];
+    const ot_data_t* data_in = octree_get_data(input, grid_idx);
+    // const ot_data_t* data_ta = target->data_ptrs[grid_idx];
+    const ot_data_t* data_ta = octree_get_data(target, grid_idx);
+
+    ot_data_t grid_out = 0;
+
+    if(!tree_isset_bit(tree, 0)) {
+      for(int f = 0; f < feature_size; ++f) {
+        grid_out += 8*8*8 * loss_fn(data_in[f], data_ta[f]);
+      }
+    }
+    else {
+      for(int bit_idx_l1 = 1; bit_idx_l1 < 9; ++bit_idx_l1) {
+        if(!tree_isset_bit(tree, bit_idx_l1)) {
+          int data_idx = tree_data_idx(tree, bit_idx_l1, feature_size);
+          for(int f = 0; f < feature_size; ++f) {
+            grid_out += 4*4*4 * loss_fn(data_in[data_idx + f], data_ta[data_idx + f]);
+          }
+        }
+        else {
+          for(int add_bit_idx_l2 = 0; add_bit_idx_l2 < 8; ++add_bit_idx_l2) {
+            int bit_idx_l2 = tree_child_bit_idx(bit_idx_l1) + add_bit_idx_l2;
+            if(!tree_isset_bit(tree, bit_idx_l2)) {
+              int data_idx = tree_data_idx(tree, bit_idx_l2, feature_size);
+              for(int f = 0; f < feature_size; ++f) {
+                grid_out += 2*2*2 * loss_fn(data_in[data_idx + f], data_ta[data_idx + f]);
+              }
+            }
+            else {
+              for(int add_bit_idx_l3 = 0; add_bit_idx_l3 < 8; ++add_bit_idx_l3) {
+                int bit_idx_l3 = tree_child_bit_idx(bit_idx_l2) + add_bit_idx_l3;
+                int data_idx = tree_data_idx(tree, bit_idx_l3, feature_size);
+                for(int f = 0; f < feature_size; ++f) {
+                  grid_out += loss_fn(data_in[data_idx + f], data_ta[data_idx + f]);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    #pragma omp atomic
+    output += grid_out;
+  }
+
+  return output / (n_blocks * feature_size * 8 * 8 * 8);
+}
+
+
+
+extern "C"
+void octree_smooth_mae_loss_bwd_cpu(const octree* input, const octree* target, ot_data_t beta, octree* grad) {
+  octree_cpy_scalars(input, grad);
+  octree_resize_as_cpu(input, grad);
+  octree_cpy_trees_cpu_cpu(input, grad);
+  octree_cpy_prefix_leafs_cpu_cpu(input, grad);
+
+  const int n_blocks = octree_num_blocks(input);
+  const int feature_size = input->feature_size;
+
+  ot_data_t norm = 1.0 / (n_blocks * feature_size * 8 * 8 * 8);
+  
+  auto loss_fn_dv = [beta, norm](ot_data_t x, ot_data_t y) {
+    auto l = x - y;
+    if (l<=beta) return -1.0f;
+    else if(l>=beta) return 1.0f;
+    return l/beta;
+  };
+
+  #pragma omp parallel for
+  for(int grid_idx = 0; grid_idx < n_blocks; ++grid_idx) {
+    const ot_tree_t* tree = octree_get_tree(input, grid_idx);
+    // const ot_data_t* data_in = input->data_ptrs[grid_idx];
+    const ot_data_t* data_in = octree_get_data(input, grid_idx);
+    // const ot_data_t* data_ta = target->data_ptrs[grid_idx];
+    const ot_data_t* data_ta = octree_get_data(target, grid_idx);
+    // ot_data_t* data_grad = grad->data_ptrs[grid_idx];
+    ot_data_t* data_grad = octree_get_data(grad, grid_idx);
+
+    if(!tree_isset_bit(tree, 0)) {
+      for(int f = 0; f < feature_size; ++f) {
+        data_grad[f] = 8*8*8 * norm * loss_fn_dv(data_in[f], data_ta[f]);
+      }
+    }
+    else {
+      for(int bit_idx_l1 = 1; bit_idx_l1 < 9; ++bit_idx_l1) {
+        if(!tree_isset_bit(tree, bit_idx_l1)) {
+          int data_idx = tree_data_idx(tree, bit_idx_l1, feature_size);
+          for(int f = 0; f < feature_size; ++f) {
+            data_grad[data_idx + f] = 4*4*4 * norm * loss_fn_dv(data_in[data_idx + f], data_ta[data_idx + f]);
+          }
+        }
+        else {
+          for(int add_bit_idx_l2 = 0; add_bit_idx_l2 < 8; ++add_bit_idx_l2) {
+            int bit_idx_l2 = tree_child_bit_idx(bit_idx_l1) + add_bit_idx_l2;
+            if(!tree_isset_bit(tree, bit_idx_l2)) {
+              int data_idx = tree_data_idx(tree, bit_idx_l2, feature_size);
+              for(int f = 0; f < feature_size; ++f) {
+                data_grad[data_idx + f] = 2*2*2 * norm * loss_fn_dv(data_in[data_idx + f], data_ta[data_idx + f]);
+              }
+            }
+            else {
+              for(int add_bit_idx_l3 = 0; add_bit_idx_l3 < 8; ++add_bit_idx_l3) {
+                int bit_idx_l3 = tree_child_bit_idx(bit_idx_l2) + add_bit_idx_l3;
+                int data_idx = tree_data_idx(tree, bit_idx_l3, feature_size);
+                for(int f = 0; f < feature_size; ++f) {
+                  data_grad[data_idx + f] = norm * loss_fn_dv(data_in[data_idx + f], data_ta[data_idx + f]);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
 
 inline void octree_nll_loss_vx(const ot_data_t* input, const ot_data_t* target, const ot_data_t* weights, const int feature_size, const int class_base, const int data_idx, const int vxs, ot_data_t* out, ot_data_t* total_weight) {
   int cur_target = round(target[data_idx]) - class_base;

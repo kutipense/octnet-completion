@@ -26,11 +26,10 @@ function train_epoch(opt, data_loader)
 
       net:backward(input, dfdx)
 
-
       local saved = false
       if(f < opt.min_loss) then
         opt.min_loss = f
-        local net_path = string.format('models/best%05f.t7', opt.min_loss) --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
+        local net_path = 'models/best.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
         torch.save(net_path, opt.net:clearState())
     
         local state_path = 'models/state.t7'
