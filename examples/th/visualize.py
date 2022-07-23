@@ -69,4 +69,4 @@ for i, fname in enumerate(['input', 'output', 'target']):
   grid = pyoctnet.Octree.create_from_bin(bytes('junk/%s.oc' %fname, encoding="ascii"))
   grid_wireframe(fig, axs[i], grid, fname)
   print(grid.mem_using())
-  fig.savefig("junk/output.jpg", dpi=300)
+fig.savefig("junk/output.jpg", dpi=300)

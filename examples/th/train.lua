@@ -19,22 +19,23 @@ function train_epoch(opt, data_loader)
       local input, _target = data_loader:getBatch()
       local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
       local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
-  
+      local target_p = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
+
       target:log_scale()
 
       local output = net:forward(input)
-      local prob_output = output[1]
-      local tree_output = output[2]
 
-      local f = criterion:forward(tree_output, target)
-      local dfdx = criterion:backward(tree_output, target)
-      print(prob_output:size())
-      local f_p = criterion_prob:forward(prob_output, _target)
-      local dfdx_p = criterion_prob:backward(prob_output, _target)
+      target_p:clamp(1)
+      local f_p = criterion_prob:forward(output[1], target_p)
+      local dfdx_p = criterion_prob:backward(output[1], target_p)
+
+      local f = criterion:forward(output[2], target)
+      local dfdx = criterion:backward(output[2], target)
+
 
       net:backward(input, {dfdx_p, dfdx})
 
-      print(f,f_p)
+      -- print(f,f_p)
 
       local saved = false
       if(f < opt.min_loss) then
@@ -53,7 +54,7 @@ function train_epoch(opt, data_loader)
 
       if batch_idx < 129 or batch_idx % math.floor((n_batches / 200)) == 0 then
         print(
-          string.format('epoch=%2d | iter=%4d | loss=%9.6f ', opt.epoch, batch_idx, f) ..  ( saved and 'saved' or ''))
+          string.format('epoch=%2d | iter=%4d | loss=%9.6f,%9.6f ', opt.epoch, batch_idx, f, f_p) ..  ( saved and 'saved' or ''))
       end
 
       return f, grad_parameters

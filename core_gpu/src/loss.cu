@@ -28,6 +28,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 
 #include <thrust/execution_policy.h>
 #include <thrust/transform_reduce.h>
@@ -738,7 +739,7 @@ void octree_bce_ds_loss_gpu(const octree* input, const octree* target, const oct
     printf("[ERROR] bce_ds_loss - shape of inputs do not match\n");
     exit(-1);
   }
-  if(!octree_equal_shape(input, weights)) {
+  if(weights!=0 && !octree_equal_shape(input, weights)) {
     printf("[ERROR] bce_ds_loss - shape of inputs do not match\n");
     exit(-1);
   }
