@@ -173,13 +173,13 @@ end
 
 --- Create a octree batch from a dense array.
 -- @param array Torch tensor with dimensions (batch, depth, height, width, feature_size) 
-function FloatOctree:octree_create_from_dense_features_batch(array)
+function FloatOctree:octree_create_from_dense_features_batch(array, tr_dist)
   if array:nDimension() ~= 5 then
     error('invalid tensor in create_from_dense_batch')
   end
   
   local grid = oc.FloatOctree()
-  grid.grid = oc_float_gc_wrapper( oc.cpu.octree_create_from_dense_features_batch_cpu(array:data(), array:size(1), array:size(2), array:size(3), array:size(4), array:size(5), false, 0, false, 1) )
+  grid.grid = oc_float_gc_wrapper( oc.cpu.octree_create_from_dense_features_batch_cpu(array:data(), array:size(1), array:size(2), array:size(3), array:size(4), array:size(5), tr_dist, false, 0, false, 1) )
   return grid
 end
 

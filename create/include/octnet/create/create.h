@@ -104,8 +104,8 @@ octree* octree_create_from_dense_batch_cpu(const ot_data_t* data, int batch_size
 octree* octree_create_from_dense_cpu(const ot_data_t* data, int depth, int height, int width, int n_ranges, const ot_data_t* ranges, bool fit, int fit_multiply, bool pack, int n_threads);
 octree* octree_create_from_dense2_cpu(const ot_data_t* occupancy, const ot_data_t* features, int feature_size, int depth, int height, int width, bool fit, int fit_multiply, bool pack, int n_threads);
 
-octree* octree_create_from_dense_features_batch_cpu(const ot_data_t* data, int batch_size, int depth, int height, int width, int feature_size, bool fit, int fit_mulitply, bool pack, int n_threads);
-octree* octree_create_from_dense_features_cpu(const ot_data_t* data, int depth, int height, int width, int feature_size, bool fit, int fit_multiply, bool pack, int n_threads);
+octree* octree_create_from_dense_features_batch_cpu(const ot_data_t* data, int batch_size, int depth, int height, int width, int feature_size, ot_data_t tr_dist, bool fit, int fit_mulitply, bool pack, int n_threads);
+octree* octree_create_from_dense_features_cpu(const ot_data_t* data, int depth, int height, int width, int feature_size, ot_data_t tr_dist, bool fit, int fit_multiply, bool pack, int n_threads);
 
 octree* octree_create_from_mesh_cpu(int n_verts_, float* verts_, int n_faces_, int* faces, bool rescale_verts, ot_size_t depth, ot_size_t height, ot_size_t width, bool fit, int fit_multiply, bool pack, int pad, int n_threads);
 octree* octree_create_from_off_cpu(const char* path, ot_size_t depth, ot_size_t height, ot_size_t width, const float R[9], bool fit, int fit_multiply, bool pack, int pad, int n_threads);

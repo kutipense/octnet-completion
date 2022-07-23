@@ -41,9 +41,9 @@ public:
   /// \param width_ dense width
   /// \param feature_size_ dense feature size (= octree feature size)
   /// \param data_ data array in format dhwc
-  OctreeCreateFromDenseFeaturesCpu(ot_size_t depth_, ot_size_t height_, ot_size_t width_, ot_size_t feature_size_, const ot_data_t* data_) : 
+  OctreeCreateFromDenseFeaturesCpu(ot_size_t depth_, ot_size_t height_, ot_size_t width_, ot_size_t feature_size_, const ot_data_t* data_, ot_data_t tr_dist) : 
       OctreeCreateCpu((depth_ + 7) / 8, (height_ + 7) / 8, (width_ + 7) / 8, feature_size_), 
-      depth(depth_), height(height_), width(width_), data(data_), epsilon(1e-12) {}
+      depth(depth_), height(height_), width(width_), data(data_), tr_dist(tr_dist) {}
 
   /// Destructor.
   virtual ~OctreeCreateFromDenseFeaturesCpu() {}
@@ -72,21 +72,24 @@ public:
           if(d >= 0 && h >= 0 && w >= 0 && d < depth && h < height && w < width) {
             // std::cout << "features: ";
             bool isnumeric = true;
+            ot_data_t prod = 1.0;
             for (int f = 0; isnumeric && f < feature_size; ++f) {
               float val = data[((d*height + h)*width + w)*feature_size + f];
               
               // occupied if at least one of the features is significantly
               // different from zero.
-              if(isinf(val)){
-                isnumeric = false;
-              } 
+              prod *= val;
+              // if(isinf(val)){
+              //   isnumeric = false;
+              // } 
               // std::cout << val << std::endl;
 
               // if(val > epsilon || val < -epsilon) {
               //   return true;
               // }
             }
-            if(isnumeric) return true;
+            // if(isnumeric) return true;
+            if(prod <= tr_dist && prod >= -tr_dist) return true;
           }
         }
       }
@@ -128,17 +131,17 @@ private:
   const ot_size_t height;
   const ot_size_t width;
   const ot_data_t* data;
-  const ot_data_t epsilon;
+  const ot_data_t tr_dist;
 };
 
 
 extern "C"
-octree* octree_create_from_dense_features_batch_cpu(const ot_data_t* data, int batch_size, int depth, int height, int width, int feature_size, bool fit, int fit_multiply, bool pack, int n_threads) {
+octree* octree_create_from_dense_features_batch_cpu(const ot_data_t* data, int batch_size, int depth, int height, int width, int feature_size, ot_data_t tr_dist, bool fit, int fit_multiply, bool pack, int n_threads) {
   // create individual octrees
   octree** octrees = new octree*[batch_size];
   for (int n = 0; n < batch_size; ++n) {
     int offset = depth * height * width * feature_size * n;
-    octrees[n] = octree_create_from_dense_features_cpu(data + offset, depth, height, width, feature_size, fit, fit_multiply, pack, n_threads);
+    octrees[n] = octree_create_from_dense_features_cpu(data + offset, depth, height, width, feature_size, tr_dist, fit, fit_multiply, pack, n_threads);
   }
 
   // stack/combine octrees
@@ -155,7 +158,7 @@ octree* octree_create_from_dense_features_batch_cpu(const ot_data_t* data, int b
 
 
 extern "C"
-octree* octree_create_from_dense_features_cpu(const ot_data_t* data, int depth, int height, int width, int feature_size, bool fit, int fit_multiply, bool pack, int n_threads) {
-  OctreeCreateFromDenseFeaturesCpu create(depth, height, width, feature_size, data);
+octree* octree_create_from_dense_features_cpu(const ot_data_t* data, int depth, int height, int width, int feature_size, ot_data_t tr_dist, bool fit, int fit_multiply, bool pack, int n_threads) {
+  OctreeCreateFromDenseFeaturesCpu create(depth, height, width, feature_size, data, tr_dist);
   return create(fit, fit_multiply, pack, n_threads);
 }

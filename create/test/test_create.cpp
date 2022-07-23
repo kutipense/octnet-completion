@@ -56,7 +56,7 @@ void test_dense_features() {
   }
   std::cout << std::endl;
   
-  octree* o = octree_create_from_dense_features_cpu(data, depth, height, width, channels, false, 0, false, 4);
+  octree* o = octree_create_from_dense_features_cpu(data, depth, height, width, channels, 3, false, 0, false, 4);
   octree_print_cpu(o);
 }
 

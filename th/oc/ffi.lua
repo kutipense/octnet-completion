@@ -229,8 +229,8 @@ octree* octree_create_from_dense_batch_cpu(const ot_data_t* data, int batch_size
 octree* octree_create_from_dense_cpu(const ot_data_t* data, int depth, int height, int width, int n_ranges, const ot_data_t* ranges, bool fit, int fit_multiply, bool pack, int n_threads);
 
 //------------------------------------------------------------------------------
-octree* octree_create_from_dense_features_batch_cpu(const ot_data_t* data, int batch_size, int depth, int height, int width, int feature_size, bool fit, int fit_multiply, bool pack, int n_threads);
-octree* octree_create_from_dense_features_cpu(const ot_data_t* data, int depth, int height, int width, int feature_size, bool fit, int fit_multiply, bool pack, int n_threads);
+octree* octree_create_from_dense_features_batch_cpu(const ot_data_t* data, int batch_size, int depth, int height, int width, int feature_size, ot_data_t tr_dist, bool fit, int fit_multiply, bool pack, int n_threads);
+octree* octree_create_from_dense_features_cpu(const ot_data_t* data, int depth, int height, int width, int feature_size, ot_data_t tr_dist, bool fit, int fit_multiply, bool pack, int n_threads);
 ]]
 
 --------------------------------------------------------------------------------

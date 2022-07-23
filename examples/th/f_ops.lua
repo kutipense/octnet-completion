@@ -37,6 +37,7 @@ end
 
 local function parse_sdf(input_sdf)
     return torch.cat(torch.abs(input_sdf), torch.sign(input_sdf), 4)
+    -- return input_sdf
 end
 
 local function parse_df(input_df)
