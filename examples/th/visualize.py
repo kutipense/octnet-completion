@@ -48,25 +48,25 @@ def grid_wireframe(fig, ax, grid, f_name):
     x,y,z = np.indices(np.array(voxel.shape) + 1)*2**i
     ax.voxels(x,y,z, voxel, edgecolor=color[i], facecolors=(0,0,0,0) if i!=0 else colors)
 
-  fig.savefig("junk/%s.jpg" % f_name, dpi=300)
 
-fig = plt.figure()
-fig.set_size_inches(10, 10)
-ax = fig.add_subplot(111, projection='3d')
-ax.view_init(elev=30, azim=-45)
-plt.tight_layout()
-ax.set_xlim(0,32)
-ax.set_ylim(0,32)
-ax.set_zlim(0,32)
-ax.xaxis.pane.fill = False
-ax.yaxis.pane.fill = False
-ax.zaxis.pane.fill = False
-ax.grid(False)
+fig, axs = plt.subplots(1, 3, subplot_kw=dict(projection='3d'))
+fig.set_size_inches(30, 10)
+# for ax in axs:
+#   ax.view_init(elev=30, azim=-45)
+#   plt.tight_layout()
+#   ax.set_xlim(0,32)
+#   ax.set_ylim(0,32)
+#   ax.set_zlim(0,32)
+#   ax.xaxis.pane.fill = False
+#   ax.yaxis.pane.fill = False
+#   ax.zaxis.pane.fill = False
+#   ax.grid(False)
 # ax._axis3don = False
 # ax.dist = 10
 
 
-for i in ['output', 'input', 'target']:
-  grid = pyoctnet.Octree.create_from_bin(bytes('junk/%s.oc' %i, encoding="ascii"))
-  grid_wireframe(fig, ax, grid, i)
+for i, fname in enumerate(['input', 'output', 'target']):
+  grid = pyoctnet.Octree.create_from_bin(bytes('junk/%s.oc' %fname, encoding="ascii"))
+  grid_wireframe(fig, axs[i], grid, fname)
   print(grid.mem_using())
+  fig.savefig("junk/output.jpg", dpi=300)

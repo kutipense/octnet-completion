@@ -3,6 +3,7 @@
 function train_epoch(opt, data_loader)
   local net = opt.net or error('no net in train_epoch')
   local criterion = opt.criterion or error('no criterion in train_epoch')
+  local criterion_prob = opt.criterion_prob or error('no criterion_prob in train_epoch')
   local optimizer = opt.optimizer or error('no optimizer in train_epoch')
 
   local n_batches = data_loader:n_batches()
@@ -15,19 +16,25 @@ function train_epoch(opt, data_loader)
       if x ~= parameters then parameters:copy(x) end
       grad_parameters:zero()
 
-      local input, target = data_loader:getBatch()
-      local input = oc.FloatOctree():octree_create_from_dense_features_batch(input):cuda()
-      local target = oc.FloatOctree():octree_create_from_dense_features_batch(target):cuda()
-      
-      input:clamp(opt.tr_dist)
-      target:clamp(opt.tr_dist)
+      local input, _target = data_loader:getBatch()
+      local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
+      local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
+  
       target:log_scale()
 
       local output = net:forward(input)
-      local f = criterion:forward(output, target)
-      local dfdx = criterion:backward(output, target)
+      local prob_output = output[1]
+      local tree_output = output[2]
 
-      net:backward(input, dfdx)
+      local f = criterion:forward(tree_output, target)
+      local dfdx = criterion:backward(tree_output, target)
+      print(prob_output:size())
+      local f_p = criterion_prob:forward(prob_output, _target)
+      local dfdx_p = criterion_prob:backward(prob_output, _target)
+
+      net:backward(input, {dfdx_p, dfdx})
+
+      print(f,f_p)
 
       local saved = false
       if(f < opt.min_loss) then

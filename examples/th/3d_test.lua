@@ -15,7 +15,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 
 
 local opt = {}
-opt.batch_size = 1
+opt.batch_size = 4
 opt.data_paths = { 
     "/root/vol/octnet-completion/benchmark/sdf",
     "/root/vol/octnet-completion/benchmark/df" 
@@ -26,12 +26,13 @@ opt.num_features = 80
 opt.full_batches = true
 opt.tr_dist = 3
 opt.weightDecay = 0.0001
-opt.learningRate = 1e-4 * 5
+opt.learningRate = 1e-4
 opt.n_epochs = 250
 opt.learningRate_steps = {}
 opt.learningRate_steps[15] = 0.1
 opt.optimizer = optim['adam']
-opt.criterion = oc.OctreeSmoothMAECriterion() -- TODO implement SmoothL1 and L1
+opt.criterion = oc.OctreeSmoothMAECriterion() -- TODO implement and L1
+opt.criterion_prob = oc.OctreeSplitCriterion()
 opt.criterion:cuda()
 
 -- create model
@@ -40,54 +41,26 @@ opt.net = completion_model.create_model(opt)
 -- create data loader
 local train_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit")
 local test_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit")
+-- completion_model.model_to_dot(opt.net)
+-- local input, target = train_data_loader:getBatch()
+-- local input, target = train_data_loader:getBatch()
+-- local input, target = train_data_loader:getBatch()
+-- local input, target = train_data_loader:getBatch()
 
-local input, target = train_data_loader:getBatch()
-local input = oc.FloatOctree():octree_create_from_dense_features_batch(input):cuda()
-local target = oc.FloatOctree():octree_create_from_dense_features_batch(target):cuda()
+-- local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
+-- local target = oc.FloatOctree():octree_create_from_dense_features_batch(target, opt.tr_dist):cuda()
 
--- input:clamp(opt.tr_dist)
 -- model = torch.load('models/best.t7')
 -- model:evaluate()
--- -- print(input:size())
+
 -- output = model:forward(input)
+-- output_p = output[1]
+-- output = output[2]
 -- output:log_scale_inv()
 
--- -- output:float():print()
--- target:float():print()
--- input:write_to_bin('input.oc')
--- output:write_to_bin('output.oc')
+-- input:write_to_bin('junk/input.oc')
+-- output_p:write_to_bin('junk/output_p.oc')
+-- output:write_to_bin('junk/output.oc')
+-- target:write_to_bin('junk/target.oc')
 
 train.worker(opt, train_data_loader, test_data_loader)
-
--- local shuffle = torch.randperm(2)
--- shuffle = shuffle:narrow(1, 1, opt.batch_size)
--- shuffle = shuffle:long()
--- shuffle = torch.LongTensor({1,2})
-
--- local input = inputs:index(1, shuffle) -- Important for Octree conversion!
--- local output = outputs:index(1, shuffle)
-
--- local tr_dist = 3;
-
--- local input_oc = oc.FloatOctree():octree_create_from_dense_features_batch(input)
--- input_oc = input_oc:cuda()
--- input_oc:clamp(tr_dist)
-
--- local f = input_oc:float()
--- local s = f:extract_n(1,2)
--- local ss = f:extract_n(2,3)
--- print(ss:max())
--- ss:print()
--- local output_oc = oc.FloatOctree():octree_create_from_dense_features_batch(output)
--- input_oc = input_oc:cuda()
--- output_oc = output_oc:cuda()
--- print('input size:')
--- print(input_oc:size())
--- -- print('--------')
-
--- local pred = model:forward(input_oc)
--- print('output size:')
--- print(pred:size())
--- print(input_oc:n_elems(), pred:n_elems(),output_oc:n_elems())
--- ss:write_to_bin("test.oc")
-
