@@ -17,16 +17,12 @@ function train_epoch(opt, data_loader)
 
       local input, _target = data_loader:getBatch()
       local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
-      -- local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
-      _target = torch.log(torch.abs(_target) + 1)
-      _target = _target:cuda()
-      -- target:log_scale()
+      
+      _target = torch.log(torch.abs(_target) + 1):cuda()
+      
       local output = net:forward(input)
       local f = criterion:forward(output, _target)
       local dfdx = criterion:backward(output, _target):cuda()
-
-      local f = criterion:forward(output[3], target)
-      local dfdx = criterion:backward(output[3], target)
 
       net:backward(input, dfdx)
 
@@ -60,10 +56,10 @@ function train_epoch(opt, data_loader)
 end
 
 function test_epoch(opt, data_loader)
-  local net = opt.net or error('no net in test_epoch')
-  local criterion = opt.criterion or error('no criterion in test_epoch')
-  local data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit", opt.tr_dist)
-  local n_batches = data_loader:n_batches() --data_loader:n_batches()
+  local net = opt.net or error('no net in train_epoch')
+  local criterion = opt.criterion_test or error('no criterion in train_epoch')
+
+  local n_batches = data_loader:n_batches()
 
   net:evaluate()
 
@@ -71,42 +67,33 @@ function test_epoch(opt, data_loader)
   local accuracy = 0
   local n_samples = 0
   for batch_idx = 1, n_batches do
-    print(string.format('[INFO] test batch %d/%d', batch_idx, n_batches))
 
-    local timer = torch.Timer()
     local input, target = data_loader:getBatch()
-    local input = oc.FloatOctree():octree_create_from_dense_features_batch(input)
-    input = input:cuda()
-    input:clamp(opt.tr_dist)
-    print(string.format('[INFO] loading data took %f[s] - n_batches %d', timer:time().real, target:size(1)))
-
-    local timer = torch.Timer()
-    local output = net:forward(input)
-    local target = oc.FloatOctree():octree_create_from_dense_features_batch(target)
+    local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
+    
     target = target:cuda()
-    output = output[{ { 1, target:size(1) }, {} }]
-    local f = criterion:forward(output, target)
-    print(string.format('[INFO] net/crtrn fwd took %f[s]', timer:time().real))
-    avg_f = avg_f + f
 
-    local maxs, indices = torch.max(output, 2)
-    for bidx = 1, target:size(1) do
-      if indices[bidx][1] == target[bidx] then
-        accuracy = accuracy + 1
-      end
-      n_samples = n_samples + 1
-    end
+    local output = net:forward(input)
+    output = torch.exp(output) - 1
+    output = output:cuda()
+    
+    avg_f = avg_f + criterion:forward(output, target)
   end
+  
   avg_f = avg_f / n_batches
-  accuracy = accuracy / n_samples
 
-  print(string.format('test_epoch=%d, avg_f=%f, accuracy=%f', opt.epoch, avg_f, accuracy))
+  if(avg_f < opt.best_val) then
+    opt.best_val = avg_f
+  end
+
+  print(string.format('test_epoch=%d, avg_f=%f, best_val=%f', opt.epoch, avg_f, opt.best_val))
 end
 
 function worker(opt, train_data_loader, test_data_loader)
   local start_epoch = 1
   
   opt.min_loss = opt.min_loss or 1/0
+  opt.best_val = opt.best_val or 1/0
 
   print(string.format('[INFO] start_epoch=%d', start_epoch))
   for epoch = start_epoch, opt.n_epochs do
@@ -121,8 +108,8 @@ function worker(opt, train_data_loader, test_data_loader)
     train_epoch(opt, train_data_loader)
 
     -- save network
-    print('[INFO] saving progress')
-    if epoch % 10 == 0 then
+    if epoch % 20 == 0 then
+      print('[INFO] saving progress')
       local net_path = string.format('models/net_epoch%03d.t7', opt.epoch) --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
       torch.save(net_path, opt.net:clearState())
   
@@ -135,9 +122,12 @@ function worker(opt, train_data_loader, test_data_loader)
       print('[INFO] progress saved to: ' .. net_path)
     end
 
+    test_epoch(opt, test_data_loader)
+    
     -- clean up
     collectgarbage('collect')
     collectgarbage('collect')
+
 
     -- adjust learning rate
     if opt.learningRate_steps[epoch] ~= nil then
@@ -146,7 +136,6 @@ function worker(opt, train_data_loader, test_data_loader)
   end
 
   -- test network
-  -- test_epoch(opt, test_data_loader)
 end
 
 return {
