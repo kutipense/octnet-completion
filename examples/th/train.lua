@@ -72,14 +72,18 @@ function test_epoch(opt, data_loader)
   local n_samples = 0
   for batch_idx = 1, n_batches do
 
-    local input, target = data_loader:getBatch()
-    local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
+    local _input, target = data_loader:getBatch()
+    local input = oc.FloatOctree():octree_create_from_dense_features_batch(_input, opt.tr_dist):cuda()
     
     target = target:cuda()
 
     local output = net:forward(input)
     output = torch.exp(output) - 1
     output = output:cuda()
+
+    local mask = torch.eq(_input[{ {},{},{},{},2}], 1)
+    target[mask] = 0
+    output[mask] = 0
     
     avg_f = avg_f + criterion:forward(output, target)
   end

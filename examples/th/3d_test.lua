@@ -66,4 +66,4 @@ local test_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, o
 -- output:write_to_bin('junk/output.oc')
 -- target:write_to_bin('junk/target.oc')
 
--- train.worker(opt, train_data_loader, test_data_loader)
+train.worker(opt, train_data_loader, test_data_loader)
