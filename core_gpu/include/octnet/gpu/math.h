@@ -37,6 +37,8 @@ void octree_scalar_mul_gpu(octree* grid, const ot_data_t scalar);
 
 void octree_clamp_gpu(octree* grid, const ot_data_t tr_dist);
 
+void octree_to_occupancy_gpu(octree* grid);
+
 ot_data_t octree_min_gpu(const octree* grid_in);
 ot_data_t octree_max_gpu(const octree* grid_in);
 
