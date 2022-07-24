@@ -19,6 +19,12 @@ function train_epoch(opt, data_loader)
       local input, _target = data_loader:getBatch()
       local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
       local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
+      local target16 = oc.FloatOctree():cuda()
+      local target8 = oc.FloatOctree():cuda()
+      oc.gpu.octree_gridpool2x2x2_max_gpu(target.grid, target16.grid) -- Target 16x16x16
+      oc.gpu.octree_gridpool2x2x2_max_gpu(target16.grid, target8.grid) -- Target 8x8x8
+      target16:to_occupancy()
+      target8:to_occupancy()
       local target_p = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
 
       target:log_scale()

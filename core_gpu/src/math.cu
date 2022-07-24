@@ -117,6 +117,23 @@ void octree_clamp_gpu(octree* grid, const ot_data_t tr_dist) {
 
 
 
+__global__ void kernel_to_occupancy(ot_data_t* data, int N) {
+  CUDA_KERNEL_LOOP(idx, N) {
+    if(data[idx] > 0) data[idx] = 1;
+  }
+}
+
+extern "C"
+void octree_to_occupancy_gpu(octree* grid) {
+  int n = grid->n_leafs * grid->feature_size;
+  kernel_to_occupancy<<<GET_BLOCKS(n), CUDA_NUM_THREADS>>>(
+      grid->data, n
+  );
+  CUDA_POST_KERNEL_CHECK;
+}
+
+
+
 extern "C"
 ot_data_t octree_min_gpu(const octree* grid_in) {
   int n = grid_in->n_leafs * grid_in->feature_size;

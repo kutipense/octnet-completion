@@ -413,6 +413,11 @@ function CudaOctree:clamp(tr_dist)
   return self
 end
 
+function CudaOctree:to_occupancy()
+  oc.gpu.octree_to_occupancy_gpu(self.grid)
+  return self
+end
+
 function CudaOctree:log_scale()
   oc.gpu.octree_log_scale_op_gpu(self.grid)
   return self
