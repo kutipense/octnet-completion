@@ -15,18 +15,22 @@ function train_epoch(opt, data_loader)
       if x ~= parameters then parameters:copy(x) end
       grad_parameters:zero()
 
-      local input, _target = data_loader:getBatch()
-      local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
-      
-      _target = torch.log(torch.abs(_target) + 1):cuda()
+      local _input, _target = data_loader:getBatch()
+      local input = oc.FloatOctree():octree_create_from_dense_features_batch(_input, opt.tr_dist):cuda()
+     
+      _target = torch.log(torch.abs(_target) + 1)
+      _target = _target:cuda()
       
       local output = net:forward(input)
+      
+      local mask = torch.eq(_input[{ {},{},{},{},2}], 1)
+      _target[mask] = 0
+      output[mask] = 0
+      
       local f = criterion:forward(output, _target)
       local dfdx = criterion:backward(output, _target):cuda()
 
       net:backward(input, dfdx)
-
-      -- print(f,f_p)
 
       local saved = false
       if(f < opt.min_loss) then
@@ -79,7 +83,7 @@ function test_epoch(opt, data_loader)
     
     avg_f = avg_f + criterion:forward(output, target)
   end
-  
+
   avg_f = avg_f / n_batches
 
   if(avg_f < opt.best_val) then
