@@ -26,7 +26,7 @@ opt.num_features = 80
 opt.full_batches = true
 opt.tr_dist = 3
 -- opt.weightDecay = 0.0001
-opt.learningRate = 1e-2
+opt.learningRate = 1e-3
 opt.n_epochs = 250
 opt.learningRate_steps = {}
 -- opt.learningRate_steps[15] = 0.1
@@ -54,11 +54,13 @@ model:evaluate()
 
 output = model:forward(input)
 output = torch.exp(output)  - 1
-output = output:transpose(2,5)
+output = output:transpose(2,3)
+output = output:transpose(3,4)
+output = output:transpose(4,5):float()
 output = oc.FloatOctree():octree_create_from_dense_features_batch(output, opt.tr_dist):cuda()
 print(output:size())
--- input:write_to_bin('junk/input.oc')
--- output:write_to_bin('junk/output.oc')
--- target:write_to_bin('junk/target.oc')
+input:write_to_bin('junk/input.oc')
+output:write_to_bin('junk/output.oc')
+target:write_to_bin('junk/target.oc')
 
-train.worker(opt, train_data_loader, test_data_loader)
+-- train.worker(opt, train_data_loader, test_data_loader)

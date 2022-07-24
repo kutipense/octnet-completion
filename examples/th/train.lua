@@ -15,18 +15,18 @@ function train_epoch(opt, data_loader)
       if x ~= parameters then parameters:copy(x) end
       grad_parameters:zero()
 
-      local input, _target = data_loader:getBatch()
-      local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
+      local _input, _target = data_loader:getBatch()
+      local input = oc.FloatOctree():octree_create_from_dense_features_batch(_input, opt.tr_dist):cuda()
       -- local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
       _target = torch.log(torch.abs(_target) + 1)
       _target = _target:cuda()
       -- target:log_scale()
+      local mask = torch.eq(_input[{ {},{},{},{},2}], 1)
+      _target[mask] = 0
       local output = net:forward(input)
+      output[mask] = 0
       local f = criterion:forward(output, _target)
       local dfdx = criterion:backward(output, _target):cuda()
-
-      local f = criterion:forward(output[3], target)
-      local dfdx = criterion:backward(output[3], target)
 
       net:backward(input, dfdx)
 
