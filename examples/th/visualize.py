@@ -15,7 +15,7 @@ def grid_wireframe(fig, ax, grid, f_name):
      for i in range(0,4)]
 
   levels = set()
-  colors = np.zeros((grid.vx_depth(),grid.vx_height(),grid.vx_width(),3))
+  colors = [np.zeros((grid.vx_depth()//2**i,grid.vx_height()//2**i,grid.vx_width()//2**i,3)) for i in range(0,4)]
   for (leaf, grid_idx, bit_idx, gd,gh,gw, bd,bh,bw, level) in pyoctnet.leaf_iterator(grid, leafs_only=False):
     x = gw * 8 + bw
     y = gh * 8 + bh
@@ -25,8 +25,12 @@ def grid_wireframe(fig, ax, grid, f_name):
   
     z_dim = voxels[ind].shape[2] - 1
     # print(z_dim - z//width)
-    if ind > 0 and leaf:
+    if ind > 0 and not leaf:
       voxels[ind][x//width,z_dim-z//width,y//width] = 1
+      grid_data = grid.get_grid_data()
+      data_idx = grid.data_idx(grid_idx, bit_idx)
+      sdf = (grid_data[data_idx + 0])
+      colors[ind][x//width,z_dim-z//width,y//width] = [abs(sdf)*0.5, abs(sdf), 1-abs(sdf)]
 
     levels.add(level)
 
@@ -34,19 +38,23 @@ def grid_wireframe(fig, ax, grid, f_name):
       grid_data = grid.get_grid_data()
       data_idx = grid.data_idx(grid_idx, bit_idx)
       sdf = (grid_data[data_idx + 0])
-      if abs(sdf) < 3 and abs(sdf) > 1e-5:
+      if abs(sdf) < 4 and abs(sdf) > 1e-5:
         voxels[ind][x//width,z_dim-z//width,y//width] = 1
         # c = (1,0,0)
         # if sdf < 0:
         #   c = (0,0,0)
-        colors[x//width,z_dim-z//width,y//width] = [abs(sdf)*0.5, abs(sdf), 3-abs(sdf)]
+        colors[ind][x//width,z_dim-z//width,y//width] = [abs(sdf)*0.5, abs(sdf), 3-abs(sdf)]
 
   # print(levels)
-  color = [(0.87,0.22,0.37,1.0), (0.87,0.22,0.37,0.0), (0.87,0.22,0.37,0.0), (0.87,0.22,0.37,0.0)]
-  colors = NormalizeData(colors)
+  color = [(0.87,0.22,0.37,0.3), (0.87,0.22,0.37,0.1), (0.87,0.22,0.37,0.1), (0.87,0.22,0.37,0.1)]
+  colors = [NormalizeData(i) for i in colors]
   for i,voxel in enumerate(voxels):
-    x,y,z = np.indices(np.array(voxel.shape) + 1)*2**i
-    ax.voxels(x,y,z, voxel, edgecolor=color[i], facecolors=(0,0,0,0) if i!=0 else colors)
+    k=1
+    if f_name == 'output_p1':
+      k*=2
+    x,y,z = np.indices(np.array(voxel.shape) + 1)*2**i * k
+    
+    ax.voxels(x,y,z, voxel, edgecolor=color[i], facecolors=(0,0,0,0) if i!=0 else colors[i])
 
 
 fig, axs = plt.subplots(1, 3, subplot_kw=dict(projection='3d'))

@@ -15,7 +15,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 
 
 local opt = {}
-opt.batch_size = 8
+opt.batch_size = 4
 opt.data_paths = { 
     "/root/vol/octnet-completion/benchmark/sdf",
     "/root/vol/octnet-completion/benchmark/df" 
@@ -46,22 +46,29 @@ local test_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, o
 -- local input, target = train_data_loader:getBatch()
 -- local input, target = train_data_loader:getBatch()
 -- local input, target = train_data_loader:getBatch()
--- local input, target = train_data_loader:getBatch()
+local input, target = train_data_loader:getBatch()
 
--- local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
--- local target = oc.FloatOctree():octree_create_from_dense_features_batch(target, opt.tr_dist):cuda()
+local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
+local target = oc.FloatOctree():octree_create_from_dense_features_batch(target, opt.tr_dist):cuda()
 
--- model = torch.load('models/net_epoch030.t7')
--- model:evaluate()
+model = torch.load('models/net_epoch010.t7')
+model:evaluate()
 
--- output = model:forward(input)
--- output_p = output[1]
--- output = output[2]
--- output:log_scale_inv()
+print(model.modules)
 
--- input:write_to_bin('junk/input.oc')
--- output_p:write_to_bin('junk/output_p.oc')
--- output:write_to_bin('junk/output.oc')
--- target:write_to_bin('junk/target.oc')
+output = model:forward(input)
+output2 = model.modules[10].output
+print(output2:size())
+-- print(output)
+output_p1 = output[1]
+output_p2 = output[2]
+output = output[3]
+output:log_scale_inv()
 
-train.worker(opt, train_data_loader, test_data_loader)
+input:write_to_bin('junk/input.oc')
+output_p1:write_to_bin('junk/output_p1.oc')
+output_p2:write_to_bin('junk/output_p2.oc')
+output:write_to_bin('junk/output.oc')
+target:write_to_bin('junk/target.oc')
+
+-- train.worker(opt, train_data_loader, test_data_loader)

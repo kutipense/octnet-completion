@@ -20,23 +20,25 @@ function train_epoch(opt, data_loader)
       local input, _target = data_loader:getBatch()
       local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
       local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
+      
+      local target32 = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
       local target16 = oc.FloatOctree():cuda()
-      local target8 = oc.FloatOctree():cuda()
+      -- local target8 = oc.FloatOctree():cuda()
       oc.gpu.octree_gridpool2x2x2_max_gpu(target.grid, target16.grid) -- Target 16x16x16
-      oc.gpu.octree_gridpool2x2x2_max_gpu(target16.grid, target8.grid) -- Target 8x8x8
+      -- oc.gpu.octree_gridpool2x2x2_max_gpu(target16.grid, target8.grid) -- Target 8x8x8
+      target32:to_occupancy()
       target16:to_occupancy()
-      target8:to_occupancy()
-      local target_p = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
-
+      -- target8:to_occupancy()
       target:log_scale()
+      -- print("test")
 
       local output = net:forward(input)
 
-      local f_p1 = criterion_prob1:forward(output[1], target_p)
-      local dfdx_p1 = criterion_prob1:backward(output[1], target_p)
+      local f_p1 = criterion_prob1:forward(output[1], target16)
+      local dfdx_p1 = criterion_prob1:backward(output[1], target16)
 
-      local f_p2 = criterion_prob2:forward(output[2], target_p)
-      local dfdx_p2 = criterion_prob2:backward(output[2], target_p)
+      local f_p2 = criterion_prob2:forward(output[2], target32)
+      local dfdx_p2 = criterion_prob2:backward(output[2], target32)
 
       local f = criterion:forward(output[3], target)
       local dfdx = criterion:backward(output[3], target)
@@ -60,7 +62,7 @@ function train_epoch(opt, data_loader)
 
       if batch_idx < 129 or batch_idx % math.floor((n_batches / 200)) == 0 then
         print(
-          string.format('epoch=%2d | iter=%4d | loss=%9.6f,%9.6f ', opt.epoch, batch_idx, f, f_p1, f_p2) ..  ( saved and 'saved' or ''))
+          string.format('epoch=%2d | iter=%4d | loss=%9.6f,%9.6f,%9.6f ', opt.epoch, batch_idx, f, f_p1, f_p2) ..  ( saved and 'saved' or ''))
       end
 
       return f, grad_parameters

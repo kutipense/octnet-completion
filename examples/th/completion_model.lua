@@ -60,10 +60,12 @@ local function create_model(opt)
         :add(oc.OctreeConvolutionMM(num_features * 4, num_features * 2)) --additional
         :add(oc.OctreeBatchNormalizationSS(num_features * 2)) --additional
         :add(oc.OctreeReLU(true)) --additional
-        :add(oc.OctreeGridUnpoolGuided2x2x2(conv2:get(1)))
+        :add(oc.OctreeGridUnpool2x2x2())
     
     deconv3_inter = nn.Sequential()
-        :add(oc.OctreeConvolutionMM(num_features*2, 1))
+        :add(oc.OctreeConvolutionMM(num_features*2, num_features))
+        :add(oc.OctreeReLU(true)) --additional
+        :add(oc.OctreeConvolutionMM(num_features, 1))
         :add(oc.OctreeSigmoid(false))
     
     deconv3_cont = nn.Sequential()
@@ -74,21 +76,20 @@ local function create_model(opt)
 
     --16x16x16
     deconv4 = nn.Sequential()        
-        :add(oc.OctreeConvolutionMM(num_features * 2, num_features)) --additional
+        :add(oc.OctreeConvolutionMM(num_features, num_features)) --additional
         :add(oc.OctreeBatchNormalizationSS(num_features)) --additional
         :add(oc.OctreeReLU(true)) --additional
-        :add(oc.OctreeGridUnpoolGuided2x2x2(conv1:get(1)))
+        :add(oc.OctreeGridUnpool2x2x2())
     
     deconv4_inter = nn.Sequential()
+        :add(oc.OctreeConvolutionMM(num_features, num_features))
+        :add(oc.OctreeReLU(true)) --additional
         :add(oc.OctreeConvolutionMM(num_features, 1))
         :add(oc.OctreeSigmoid(false))
 
     deconv4_cont = nn.Sequential()
         :add(oc.OctreeSplitByProb(deconv4_inter, 0.5, true))
         :add(oc.OctreeConvolutionMM(num_features, num_features*2)) --num_features editl
-        :add(oc.OctreeBatchNormalizationSS(num_features*2)) --additional
-        :add(oc.OctreeReLU(true)) --additional
-        :add(oc.OctreeConvolutionMM(num_features*2, num_features*2)) --num_features editl
         :add(oc.OctreeBatchNormalizationSS(num_features*2)) --additional
         :add(oc.OctreeReLU(true)) --additional
         :add(oc.OctreeConvolutionMM(num_features*2, num_features)) --num_features editl
@@ -109,7 +110,7 @@ local function create_model(opt)
     local L8 = oc.OctreeConcat()({ L7, L2 }) - deconv3
     local L8_inter = L8 - deconv3_inter
     local L8_out = L8 - deconv3_cont
-    local L9 = oc.OctreeConcat()({ L8_out, L1 }) - deconv4
+    local L9 = L8_out - deconv4
     local L9_inter = L9 - deconv4_inter
     local L9_out = L9 - deconv4_cont
 
