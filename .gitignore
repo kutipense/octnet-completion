@@ -1,6 +1,7 @@
 **/build
 **/*.so
 .vscode/settings.json
-benchmark/
+benchmark/*
+!benchmark/*.txt
 **/junk
 **/models
