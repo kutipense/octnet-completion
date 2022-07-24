@@ -169,7 +169,7 @@ void octree_mse_loss_bwd_gpu(const octree* input, const octree* target, bool siz
 
 
 
-struct octree_smooth_mae_loss_from_leaf_idx : public thrust::unary_function<int, ot_data_t> {
+struct octree_smooth_mae_loss_from_leaf_idx : public thrust::unary_function<int, float2> {
   const octree input;
   const octree target;
   const ot_data_t beta;
@@ -178,33 +178,53 @@ struct octree_smooth_mae_loss_from_leaf_idx : public thrust::unary_function<int,
       input(input_), target(target_), beta(beta) {
   }
 
-  __host__ __device__ ot_data_t operator()(const int leaf_idx) {
-    const int grid_idx = leaf_idx_to_grid_idx(&input, leaf_idx);
-    const ot_tree_t* tree = octree_get_tree(&input, grid_idx);
+  __host__ __device__ float2 operator()(const int leaf_idx) {
+    const int in_grid_idx = leaf_idx_to_grid_idx(&input, leaf_idx);
+    const ot_tree_t* in_tree = octree_get_tree(&input, in_grid_idx);
 
-    // const int cum_n_leafs = n_leafs_upto(&input, grid_idx);
-    const int cum_n_leafs = input.prefix_leafs[grid_idx];
-    const int data_idx = leaf_idx - cum_n_leafs;
-    const int bit_idx = data_idx_to_bit_idx(tree, data_idx);
+    int in_data_idx = leaf_idx - input.prefix_leafs[in_grid_idx];
+    int in_bit_idx = data_idx_to_bit_idx(in_tree, in_data_idx);
 
-    // const ot_data_t* in = input.data_ptrs[grid_idx] + data_idx * input.feature_size;
-    const ot_data_t* in = octree_get_data(&input, grid_idx) + data_idx * input.feature_size;
-    // const ot_data_t* ta = target.data_ptrs[grid_idx] + data_idx * target.feature_size;
-    const ot_data_t* ta = octree_get_data(&target, grid_idx) + data_idx * target.feature_size;
-
-    const int depth = depth_from_bit_idx(bit_idx);
+    int n,ds,hs,ws;
+    int depth = octree_ind_to_dense_ind(&input, in_grid_idx, in_bit_idx, &n, &ds,&hs,&ws);
+    int width = width_from_depth(depth);
+    
     const ot_data_t vol = depth == 0 ? 512 : (depth == 1 ? 64 : (depth == 2 ? 8 : 1));
-
+    
     ot_data_t sum = 0;
-    for(int f = 0; f < input.feature_size; ++f) {
-      const ot_data_t z = abs(in[f] - ta[f]);
-      if(z<beta)
-        sum += vol * 0.5*z*z/beta;
-      else
-        sum += vol * (z-0.5*beta);
-    }
+    ot_data_t count = 0;
+    for(int d = ds; d < (ds+width); ++d) {
+      for(int h = hs; h < (hs+width); ++h) {
+        for(int w = ws; w < (ws+width); ++w) {
+          int gd = d / 8;
+          int gh = h / 8;
+          int gw = w / 8;
+          int bd = d % 8;
+          int bh = h % 8;
+          int bw = w % 8;
+          int ta_grid_idx = octree_grid_idx(&target, n, gd,gh,gw);
+          const ot_tree_t* ta_tree = octree_get_tree(&target, ta_grid_idx);
+          int ta_bit_idx = tree_bit_idx(ta_tree, bd,bh,bw);
+          int ta_data_idx = tree_data_idx(ta_tree, ta_bit_idx, target.feature_size);
+          const ot_data_t* ta_data = octree_get_data(&target, ta_grid_idx);
+          for(int f = 0; f < input.feature_size; ++f) {
+            ot_data_t x = input.data[leaf_idx * input.feature_size + f];
+            ot_data_t y = ta_data[ta_data_idx + f];
+            const ot_data_t z = abs(x - y);
+            if(z<beta)
+              sum += vol * 0.5*z*z/beta;
+            else
+              sum += vol * (z-0.5*beta);
+            count++;
+          }
+        }
+      }
+    } 
 
-    return sum;
+    float2 ret;
+    ret.x = sum;
+    ret.y = count;
+    return ret;
   }
 };
 
@@ -215,11 +235,18 @@ ot_data_t octree_smooth_mae_loss_gpu(const octree* input, const octree* target, 
     exit(-1);
   }
 
-  thrust::counting_iterator<int> iter(0);
-  ot_data_t output = thrust::transform_reduce(
-    thrust::device, iter, iter + input->n_leafs, 
-    octree_smooth_mae_loss_from_leaf_idx(*input, *target, beta), ot_data_t(0), thrust::plus<ot_data_t>());
 
+  float2 init;
+  init.x = 0;
+  init.y = 0;
+
+  thrust::counting_iterator<int> iter(0);
+  float2 ret = thrust::transform_reduce(
+    thrust::device, iter, iter + input->n_leafs, 
+    octree_smooth_mae_loss_from_leaf_idx(*input, *target, beta), init, octree_plus_float2_bfcn());
+
+  ot_data_t output = ret.x;
+  // std::cout << "count: " << ret.y << " " <<  (octree_num_blocks(input) * input->feature_size * 8 * 8 * 8) << std::endl;
   output = output / (octree_num_blocks(input) * input->feature_size * 8 * 8 * 8);
 
   return output;
@@ -229,32 +256,51 @@ ot_data_t octree_smooth_mae_loss_gpu(const octree* input, const octree* target, 
 __global__ void kernel_smooth_mae_loss_bwd(octree grad, int n_leafs, const octree input, const octree target, const ot_data_t norm, const ot_data_t beta) {
   
   CUDA_KERNEL_LOOP(leaf_idx, n_leafs) {
-    const int grid_idx = grad.data[leaf_idx * grad.feature_size];
-    const ot_tree_t* tree = octree_get_tree(&grad, grid_idx);
+    const int in_grid_idx = grad.data[leaf_idx * grad.feature_size];
+    const ot_tree_t* in_tree = octree_get_tree(&input, in_grid_idx);
 
-    // const int cum_n_leafs = n_leafs_upto(&grad, grid_idx);
-    const int cum_n_leafs = grad.prefix_leafs[grid_idx];
-    const int data_idx = leaf_idx - cum_n_leafs;
-    const int bit_idx = data_idx_to_bit_idx(tree, data_idx);
+    int in_data_idx = leaf_idx - input.prefix_leafs[in_grid_idx];
+    int in_bit_idx = data_idx_to_bit_idx(in_tree, in_data_idx);
 
-    // ot_data_t* grad_data = grad.data_ptrs[grid_idx] + data_idx * grad.feature_size;
-    ot_data_t* grad_data = octree_get_data(&grad, grid_idx) + data_idx * grad.feature_size;
-    // ot_data_t* input_data = input.data_ptrs[grid_idx] + data_idx * input.feature_size;
-    ot_data_t* input_data = octree_get_data(&input, grid_idx) + data_idx * input.feature_size;
-    // ot_data_t* target_data = target.data_ptrs[grid_idx] + data_idx * target.feature_size;
-    ot_data_t* target_data = octree_get_data(&target, grid_idx) + data_idx * target.feature_size;
+    int n,ds,hs,ws;
+    int depth = octree_ind_to_dense_ind(&input, in_grid_idx, in_bit_idx, &n, &ds,&hs,&ws);
+    int width = width_from_depth(depth);
 
-    const int depth = depth_from_bit_idx(bit_idx);
     const ot_data_t vol = depth == 0 ? 512 : (depth == 1 ? 64 : (depth == 2 ? 8 : 1));
 
-    for(int f = 0; f < input.feature_size; ++f) {
-      const ot_data_t z = input_data[f] - target_data[f];
-      if(z<=beta) 
-        grad_data[f] = vol * norm * -1.0f;
-      else if(z>=beta) 
-        grad_data[f] = vol * norm;
-      else 
-        grad_data[f] = vol * norm * z / beta; 
+    for(int f = 0; f < grad.feature_size; ++f) {
+      grad.data[leaf_idx * grad.feature_size + f] = 0;
+    }
+
+    for(int d = ds; d < (ds+width); ++d) {
+      for(int h = hs; h < (hs+width); ++h) {
+        for(int w = ws; w < (ws+width); ++w) {
+          int gd = d / 8;
+          int gh = h / 8;
+          int gw = w / 8;
+          int bd = d % 8;
+          int bh = h % 8;
+          int bw = w % 8;
+          int ta_grid_idx = octree_grid_idx(&target, n, gd,gh,gw);
+          const ot_tree_t* ta_tree = octree_get_tree(&target, ta_grid_idx);
+          int ta_bit_idx = tree_bit_idx(ta_tree, bd,bh,bw);
+          int ta_data_idx = tree_data_idx(ta_tree, ta_bit_idx, target.feature_size);
+          const ot_data_t* ta_data = octree_get_data(&target, ta_grid_idx);
+          for(int f = 0; f < input.feature_size; ++f) {
+            ot_data_t x = input.data[leaf_idx * input.feature_size + f];
+            ot_data_t y = ta_data[ta_data_idx + f];      
+            const ot_data_t z = x - y;
+            // ot_data_t grad;
+            if(z<=beta) 
+              grad.data[leaf_idx * grad.feature_size + f] = vol * norm * -1.0f;
+            else if(z>=beta) 
+              grad.data[leaf_idx * grad.feature_size + f] = vol * norm;
+            else 
+              grad.data[leaf_idx * grad.feature_size + f] = vol * norm * z / beta; 
+            // grad.data[leaf_idx * grad.feature_size + f] = grad;
+          }
+        }
+      }
     }
   }
 }

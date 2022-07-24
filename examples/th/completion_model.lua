@@ -29,6 +29,7 @@ local function create_model(opt)
         :add(oc.OctreeConvolutionMM(num_features * 2, num_features * 4))
         :add(oc.OctreeToCDHW()) --convert to dense
         :add(cudnn.VolumetricMaxPooling(2, 2, 2, 2, 2, 2))
+        :add(cudnn.VolumetricBatchNormalization(num_features * 4))
         :add(nn.LeakyReLU(negative_slope, true))
     -- 4x4x4
     conv4 = nn.Sequential()
@@ -60,10 +61,17 @@ local function create_model(opt)
         :add(oc.OctreeBatchNormalizationSS(num_features * 2)) --additional
         :add(oc.OctreeReLU(true)) --additional
         :add(oc.OctreeGridUnpoolGuided2x2x2(conv2:get(1)))
-        -- :add(oc.OctreeSplitFull())
+    
+    deconv3_inter = nn.Sequential()
+        :add(oc.OctreeConvolutionMM(num_features*2, 1))
+        :add(oc.OctreeSigmoid(false))
+    
+    deconv3_cont = nn.Sequential()
+        :add(oc.OctreeSplitByProb(deconv3_inter, 0.5, true))
         :add(oc.OctreeConvolutionMM(num_features * 2, num_features)) --num_features edit
         :add(oc.OctreeBatchNormalizationSS(num_features))
         :add(oc.OctreeReLU(true))
+
     --16x16x16
     deconv4 = nn.Sequential()        
         :add(oc.OctreeConvolutionMM(num_features * 2, num_features)) --additional
@@ -76,8 +84,17 @@ local function create_model(opt)
         :add(oc.OctreeSigmoid(false))
 
     deconv4_cont = nn.Sequential()
-        :add(oc.OctreeSplitByProb(deconv4_inter, 0, true))
-        :add(oc.OctreeConvolutionMM(num_features, 1)) --num_features edit
+        :add(oc.OctreeSplitByProb(deconv4_inter, 0.5, true))
+        :add(oc.OctreeConvolutionMM(num_features, num_features*2)) --num_features editl
+        :add(oc.OctreeBatchNormalizationSS(num_features*2)) --additional
+        :add(oc.OctreeReLU(true)) --additional
+        :add(oc.OctreeConvolutionMM(num_features*2, num_features*2)) --num_features editl
+        :add(oc.OctreeBatchNormalizationSS(num_features*2)) --additional
+        :add(oc.OctreeReLU(true)) --additional
+        :add(oc.OctreeConvolutionMM(num_features*2, num_features)) --num_features editl
+        :add(oc.OctreeBatchNormalizationSS(num_features)) --additional
+        :add(oc.OctreeReLU(true)) --additional
+        :add(oc.OctreeConvolutionMM(num_features, 1)) --num_features editl
         :add(oc.OctreeLogScale(false))
     --32x32x32
 
@@ -90,11 +107,13 @@ local function create_model(opt)
     local L6 = nn.JoinTable(2)({ L5, L4 }) - deconv1
     local L7 = nn.JoinTable(2)({ L6, L3 }) - deconv2
     local L8 = oc.OctreeConcat()({ L7, L2 }) - deconv3
-    local L9 = oc.OctreeConcat()({ L8, L1 }) - deconv4
+    local L8_inter = L8 - deconv3_inter
+    local L8_out = L8 - deconv3_cont
+    local L9 = oc.OctreeConcat()({ L8_out, L1 }) - deconv4
     local L9_inter = L9 - deconv4_inter
     local L9_out = L9 - deconv4_cont
 
-    model = nn.gModule({ vol }, { L9_inter, L9_out })
+    model = nn.gModule({ vol }, { L8_inter, L9_inter, L9_out })
     model = require('oc_weight_init')(model, 'xavier')
     model:cuda()
     return model
