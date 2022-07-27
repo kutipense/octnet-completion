@@ -1,7 +1,7 @@
 #!/usr/bin/env th
 -- Path to octnet module.
 -- Needs to be adapted depending on the installation directory!
-package.path = package.path .. ';/root/vol/octnet-completion/th/?/init.lua'
+package.path = package.path .. ';/root/octnet/th/?/init.lua'
 
 require('torch')
 require('optim')
@@ -15,10 +15,10 @@ torch.setdefaulttensortype('torch.FloatTensor')
 
 
 local opt = {}
-opt.batch_size = 8
+opt.batch_size = 128
 opt.data_paths = { 
-    "/root/vol/octnet-completion/benchmark/sdf",
-    "/root/vol/octnet-completion/benchmark/df" 
+    "/root/octnet/benchmark/sdf",
+    "/root/octnet/benchmark/df" 
 }
 
 opt.negative_slope = 0.2
@@ -27,7 +27,7 @@ opt.full_batches = true
 opt.tr_dist = 3
 -- opt.weightDecay = 0.0001
 opt.learningRate = 1e-3
-opt.n_epochs = 250
+opt.n_epochs = 5
 opt.learningRate_steps = {}
 -- opt.learningRate_steps[15] = 0.1
 opt.optimizer = optim['adam']
@@ -38,8 +38,8 @@ opt.criterion_test = nn.AbsCriterion():cuda() -- TODO implement and L1
 opt.net = completion_model.create_model(opt)
 
 -- create data loader
-local train_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit")
-local test_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit")
+local train_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "train")
+local test_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "val")
 -- completion_model.model_to_dot(opt.net)
 -- local input, target = train_data_loader:getBatch()
 -- -- local input, target = train_data_loader:getBatch()

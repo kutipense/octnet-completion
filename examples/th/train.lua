@@ -10,6 +10,7 @@ function train_epoch(opt, data_loader)
   net:training()
 
   local parameters, grad_parameters = net:getParameters()
+  local bestModel = nil
   for batch_idx = 1, n_batches do
     local feval = function(x)
       if x ~= parameters then parameters:copy(x) end
@@ -20,13 +21,13 @@ function train_epoch(opt, data_loader)
      
       _target = torch.log(torch.abs(_target) + 1)
       _target = _target:cuda()
-      
+
       local output = net:forward(input)
-      
+
       local mask = torch.eq(_input[{ {},{},{},{},2}], 1)
       _target[mask] = 0
       output[mask] = 0
-      
+
       local f = criterion:forward(output, _target)
       local dfdx = criterion:backward(output, _target):cuda()
 
@@ -35,15 +36,17 @@ function train_epoch(opt, data_loader)
       local saved = false
       if(f < opt.min_loss) then
         opt.min_loss = f
-        local net_path = 'models/best.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
+        --bestModel = opt.net:clearState():clone()
+      end
+      if batch_idx % 100 == 0 then
+        local net_path = string.format('models/best%03d.t7', opt.epoch) --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
         torch.save(net_path, opt.net:clearState())
-    
         local state_path = 'models/state.t7'
         if not opt.state_save_interval or opt.epoch % opt.state_save_interval == 0 then
           opt.net = opt.net:clearState()
           torch.save(state_path, opt)
-        end
-        saved = true
+         end
+        saved = true      
       end
 
 
@@ -116,7 +119,7 @@ function worker(opt, train_data_loader, test_data_loader)
     train_epoch(opt, train_data_loader)
 
     -- save network
-    if epoch % 20 == 0 then
+    if epoch % 1 == 0 then
       print('[INFO] saving progress')
       local net_path = string.format('models/net_epoch%03d.t7', opt.epoch) --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
       torch.save(net_path, opt.net:clearState())

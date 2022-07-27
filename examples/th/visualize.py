@@ -4,7 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 from math import log
-sys.path.append('/root/vol/octnet-completion/py/')
+from skimage import measure
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+sys.path.append('/root/octnet/octnet-completion/py/')
 import pyoctnet
 
 def NormalizeData(data):
@@ -49,7 +51,7 @@ def grid_wireframe(fig, ax, grid, f_name):
 fig, axs = plt.subplots(1, 3, subplot_kw=dict(projection='3d'))
 fig.set_size_inches(30, 10)
 for ax in axs:
-  ax.view_init(elev=30, azim=-30)
+  ax.view_init(elev=30, azim=-120)
   plt.tight_layout()
   ax.set_xlim(0,32)
   ax.set_ylim(0,32)
@@ -64,6 +66,23 @@ for ax in axs:
 
 for i, fname in enumerate(['input', 'output', 'target']):
   grid = pyoctnet.Octree.create_from_bin(bytes('junk/%s.oc' %fname, encoding="ascii"))
-  grid_wireframe(fig, axs[i], grid, fname)
+  ahmet = grid.to_cdhw()
+  print(ahmet.shape)
+  if fname == 'input':
+    ahmet = ahmet[0,:,:,:]
+  print(ahmet.shape)
+  verts, faces, normals, values = measure.marching_cubes(ahmet, 1)
+
+  # Display resulting triangular mesh using Matplotlib. This can also be done
+  # with mayavi (see skimage.measure.marching_cubes_lewiner docstring).
+  ax = axs[i]
+
+  # Fancy indexing: `verts[faces]` to generate a collection of triangles
+  mesh = Poly3DCollection(verts[faces])
+  mesh.set_edgecolor('k')
+  ax.add_collection3d(mesh)
+  # plt.tight_layout()
+  # grid_wireframe(fig, axs[i], grid, fname)
   print(grid.mem_using())
+# plt.show()
 fig.savefig("junk/output.jpg", dpi=300)

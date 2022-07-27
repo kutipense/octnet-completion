@@ -1,5 +1,5 @@
 #!/usr/bin/env th
-package.path = package.path .. ';/root/vol/octnet-completion/th/?/init.lua'
+package.path = package.path .. ';/root/octnet/th/?/init.lua'
 
 require('torch')
 require('nn')
@@ -31,42 +31,58 @@ local function create_model(opt)
     -- 8x8x8
     conv3 = nn.Sequential()
         :add(oc.OctreeConvolutionMM(num_features * 2, num_features * 4))
-        :add(oc.OctreeToCDHW()) --convert to dense
-        :add(cudnn.VolumetricMaxPooling(2, 2, 2, 2, 2, 2))
-        :add(cudnn.VolumetricBatchNormalization(num_features * 4))
-        :add(nn.LeakyReLU(negative_slope, true))
+        -- :add(oc.OctreeToCDHW()) --convert to dense
+        :add(oc.OctreeBatchNormalizationSS(num_features * 4))
+        :add(oc.OctreeLeakyReLU(negative_slope, true))
+    -- :add(cudnn.VolumetricMaxPooling(2, 2, 2, 2, 2, 2))
+    -- :add(cudnn.VolumetricBatchNormalization(num_features * 4))
+    -- :add(nn.LeakyReLU(negative_slope, true))
     -- 4x4x4
 
     conv4 = nn.Sequential()
-        :add(cudnn.VolumetricConvolution(num_features * 4, num_features * 8, 4, 4, 4))
-        :add(cudnn.VolumetricBatchNormalization(num_features * 8))
-        :add(nn.LeakyReLU(negative_slope, true))
+        :add(oc.OctreeConvolutionMM(num_features * 4, num_features * 8))
+        :add(oc.OctreeBatchNormalizationSS(num_features * 8))
+        :add(oc.OctreeLeakyReLU(negative_slope, true))
+    -- :add(cudnn.VolumetricConvolution(num_features * 4, num_features * 8, 4, 4, 4))
+    -- :add(cudnn.VolumetricBatchNormalization(num_features * 8))
+    -- :add(nn.LeakyReLU(negative_slope, true))
     -- 1x1x1
     bottleneck = nn.Sequential()
-        :add(nn.Reshape(num_features * 8, true))
-        :add(nn.Linear(num_features * 8, num_features * 8))
-        :add(nn.ReLU(true))
-        :add(nn.Linear(num_features * 8, num_features * 8))
-        :add(nn.ReLU(true))
-        :add(nn.Reshape(num_features * 8, 1, 1, 1))
+        :add(oc.OctreeConvolutionMM(num_features * 8, num_features * 8))
+        :add(oc.OctreeReLU(true))
+        :add(oc.OctreeConvolutionMM(num_features * 8, num_features * 8))
+        :add(oc.OctreeReLU(true))
+        -- :add(nn.Reshape(num_features * 8, true))
+        -- :add(nn.Linear(num_features * 8, num_features * 8))
+        -- :add(nn.ReLU(true))
+        -- :add(nn.Linear(num_features * 8, num_features * 8))
+        -- :add(nn.ReLU(true))
+        -- :add(oc.OctreeToCDHW())
     -- 1x1x1
     deconv1 = nn.Sequential()
-        :add(cudnn.VolumetricFullConvolution(num_features * 16, num_features * 4, 4, 4, 4, 1, 1, 1, 0, 0, 0))
-        :add(cudnn.VolumetricBatchNormalization(num_features * 4))
-        :add(cudnn.ReLU(true))
+        :add(oc.OctreeConvolutionMM(num_features * 16, num_features * 4))
+        :add(oc.OctreeBatchNormalizationSS(num_features * 4))
+        :add(oc.OctreeReLU(negative_slope, true))
+        -- :add(cudnn.VolumetricFullConvolution(num_features * 16, num_features * 4, 4, 4, 4, 1, 1, 1, 0, 0, 0))
+        -- :add(cudnn.VolumetricBatchNormalization(num_features * 4))
+        -- :add(cudnn.ReLU(true))
     -- 4x4x4
     deconv2 = nn.Sequential()
-        :add(cudnn.VolumetricFullConvolution(num_features * 8, num_features * 2, 4, 4, 4, 2, 2, 2, 1, 1, 1))
-        :add(cudnn.VolumetricBatchNormalization(num_features * 2))
-        :add(cudnn.ReLU(true))
+        :add(oc.OctreeConvolutionMM(num_features * 8, num_features * 2))
+        :add(oc.OctreeBatchNormalizationSS(num_features * 2))
+        :add(oc.OctreeReLU(negative_slope, true))
+        :add(oc.OctreeToCDHW())
+        -- :add(cudnn.VolumetricFullConvolution(num_features * 4, num_features * 2, 4, 4, 4, 2, 2, 2, 1, 1, 1))
+        -- :add(cudnn.VolumetricBatchNormalization(num_features * 2))
+        -- :add(cudnn.ReLU(true))
     --8x8x8
     deconv3 = nn.Sequential()
         :add(cudnn.VolumetricFullConvolution(num_features * 4, num_features, 4, 4, 4, 2, 2, 2, 1, 1, 1))
         :add(cudnn.VolumetricBatchNormalization(num_features))
         :add(cudnn.ReLU(true))
     --16x16x16
-    deconv4 = nn.Sequential()        
-        :add(cudnn.VolumetricFullConvolution(num_features * 2, 1, 4, 4, 4, 2, 2, 2, 1, 1, 1)) --additional
+    deconv4 = nn.Sequential()
+        :add(cudnn.VolumetricFullConvolution(num_features * 2, 1, 4, 4, 4, 2, 2, 2, 1, 1, 1))--additional
         :add(nn.Abs())
         :add(nn.AddConstant(1))
         :add(nn.Log())
@@ -81,8 +97,8 @@ local function create_model(opt)
     local L3 = L2 - conv3
     local L4 = L3 - conv4
     local L5 = L4 - bottleneck
-    local L6 = nn.JoinTable(2)({ L5, L4 }) - deconv1
-    local L7 = nn.JoinTable(2)({ L6, L3 }) - deconv2
+    local L6 = oc.OctreeConcat(2)({L5, L4}) - deconv1
+    local L7 = oc.OctreeConcat(2)({L6, L3}) - deconv2
     local L8 = nn.JoinTable(2)({ L7, L2_2 }) - deconv3
     local L9 = nn.JoinTable(2)({ L8, L1_2 }) - deconv4
 
