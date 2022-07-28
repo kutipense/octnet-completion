@@ -1,7 +1,7 @@
 #!/usr/bin/env th
 -- Path to octnet module.
 -- Needs to be adapted depending on the installation directory!
-package.path = package.path .. ';/root/vol/octnet-completion/th/?/init.lua'
+package.path = package.path .. ';/root/octnet/th/?/init.lua'
 
 require('torch')
 require('optim')
@@ -17,8 +17,8 @@ torch.setdefaulttensortype('torch.FloatTensor')
 local opt = {}
 opt.batch_size = 8
 opt.data_paths = { 
-    "/root/vol/octnet-completion/benchmark/sdf",
-    "/root/vol/octnet-completion/benchmark/df" 
+    "/root/octnet/benchmark/sdf",
+    "/root/octnet/benchmark/df" 
 }
 
 opt.negative_slope = 0.2
@@ -38,13 +38,13 @@ opt.criterion_test = nn.AbsCriterion():cuda() -- TODO implement and L1
 opt.net = completion_model.create_model(opt)
 
 -- create data loader
-local train_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit")
-local test_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "overfit")
+local train_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "train")
+local test_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, opt.full_batches, "val")
 -- completion_model.model_to_dot(opt.net)
 -- local input, target = train_data_loader:getBatch()
 -- -- local input, target = train_data_loader:getBatch()
 -- local input, target = train_data_loader:getBatch()
-local input, _target = train_data_loader:getBatch()
+-- local input, _target = train_data_loader:getBatch()
 
 -- local f_ops = require("f_ops")
 -- local sdf_batch = torch.Tensor(1, 32, 32, 32, 2):zero()
@@ -54,24 +54,24 @@ local input, _target = train_data_loader:getBatch()
 -- sdf_batch[1] = sdf
 -- df_batch[1] = df:view(32, 32, 32, 1)
 
-local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
-local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
+-- local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
+-- local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
 
-model = torch.load('models/net_epoch100.t7')
-model:evaluate()
+-- model = torch.load('models/net_epoch100.t7')
+-- model:evaluate()
 
-output = model:forward(input)
-output = torch.exp(output)  - 1
-output = output:transpose(2,3)
-output = output:transpose(3,4)
-output = output:transpose(4,5):float()
+-- output = model:forward(input)
+-- output = torch.exp(output)  - 1
+-- output = output:transpose(2,3)
+-- output = output:transpose(3,4)
+-- output = output:transpose(4,5):float()
 
-output = oc.FloatOctree():octree_create_from_dense_features_batch(output, opt.tr_dist):cuda()
+-- output = oc.FloatOctree():octree_create_from_dense_features_batch(output, opt.tr_dist):cuda()
 
-print(output:size())
+-- print(output:size())
 
-input:write_to_bin('junk/input.oc')
-output:write_to_bin('junk/output.oc')
-target:write_to_bin('junk/target.oc')
+-- input:write_to_bin('junk/input.oc')
+-- output:write_to_bin('junk/output.oc')
+-- target:write_to_bin('junk/target.oc')
 -- print(model:getParameters():size(1))
--- train.worker(opt, train_data_loader, test_data_loader)
+train.worker(opt, train_data_loader, test_data_loader)

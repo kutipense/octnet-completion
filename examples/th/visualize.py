@@ -7,7 +7,7 @@ from math import log
 from skimage import measure
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from matplotlib.colors import LightSource
-sys.path.append('/root/vol/octnet-completion/py/')
+sys.path.append('/root/octnet/octnet-completion/py/')
 import pyoctnet
 
 def NormalizeData(data):

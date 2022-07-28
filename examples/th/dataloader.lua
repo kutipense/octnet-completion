@@ -23,7 +23,7 @@ function DataLoader:__init(data_paths, batch_size, full_batches, split)
 
   self.batch_size = batch_size or error('')
   self.full_batches = full_batches or false
-  self.items = BuildArray(io.open(string.format("/root/vol/octnet-completion/benchmark/%s.txt", self.split)):lines())
+  self.items = BuildArray(io.open(string.format("/root/octnet/benchmark/%s.txt", self.split)):lines())
   self.n_samples = #self.items
   self.idx = 1
   assert(self.idx < self.n_samples, "idx should be smaller than the number of samples")

@@ -1,5 +1,5 @@
 #!/usr/bin/env th
-package.path = package.path .. ';/root/vol/octnet-completion/th/?/init.lua'
+package.path = package.path .. ';/root/octnet/th/?/init.lua'
 
 require('torch')
 require('nn')
