@@ -44,26 +44,34 @@ local test_data_loader = dataloader.DataLoader(opt.data_paths, opt.batch_size, o
 -- local input, target = train_data_loader:getBatch()
 -- -- local input, target = train_data_loader:getBatch()
 -- local input, target = train_data_loader:getBatch()
--- local input, _target = train_data_loader:getBatch()
+local input, _target = train_data_loader:getBatch()
 
--- local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
--- local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
+-- local f_ops = require("f_ops")
+-- local sdf_batch = torch.Tensor(1, 32, 32, 32, 2):zero()
+-- local df_batch = torch.Tensor(1, 32, 32, 32, 1)
+-- local sdf = f_ops.parse_sdf(f_ops.read_file("b286c9c136784db2af1744fdb1fbe7df__0__.sdf"))
+-- local df = f_ops.parse_df(f_ops.read_file("b286c9c136784db2af1744fdb1fbe7df__0__.df"))
+-- sdf_batch[1] = sdf
+-- df_batch[1] = df:view(32, 32, 32, 1)
 
--- model = torch.load('models/best.t7')
--- model:evaluate()
+local input = oc.FloatOctree():octree_create_from_dense_features_batch(input, opt.tr_dist):cuda()
+local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
 
--- output = model:forward(input)
--- output = torch.exp(output)  - 1
--- output = output:transpose(2,3)
--- output = output:transpose(3,4)
--- output = output:transpose(4,5):float()
+model = torch.load('models/net_epoch100.t7')
+model:evaluate()
 
--- output = oc.FloatOctree():octree_create_from_dense_features_batch(output, opt.tr_dist):cuda()
+output = model:forward(input)
+output = torch.exp(output)  - 1
+output = output:transpose(2,3)
+output = output:transpose(3,4)
+output = output:transpose(4,5):float()
 
--- print(output:size())
+output = oc.FloatOctree():octree_create_from_dense_features_batch(output, opt.tr_dist):cuda()
 
--- input:write_to_bin('junk/input.oc')
--- output:write_to_bin('junk/output.oc')
--- target:write_to_bin('junk/target.oc')
+print(output:size())
 
-train.worker(opt, train_data_loader, test_data_loader)
+input:write_to_bin('junk/input.oc')
+output:write_to_bin('junk/output.oc')
+target:write_to_bin('junk/target.oc')
+-- print(model:getParameters():size(1))
+-- train.worker(opt, train_data_loader, test_data_loader)

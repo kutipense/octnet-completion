@@ -25,10 +25,11 @@
 
 local CDHWToOctree, parent = torch.class('oc.CDHWToOctree', 'oc.OctreeModule')
 
-function CDHWToOctree:__init(octree_to_cdhw, fcn)
+function CDHWToOctree:__init(octree_to_cdhw, tr_dist, fcn)
   parent.__init(self)
 
   self.struct = octree_to_cdhw or error('need to specify module which output guides the octree conversation')
+  self.tr_dist = tr_dist
   self.fcn = fcn or 'avg' -- sum | avg | max
 
   self.gradInput = torch.FloatTensor()
@@ -87,15 +88,15 @@ function CDHWToOctree:updateGradInput(input, gradOutput)
 
   if self.fcn == 'sum' then
     if in_grid._type == 'oc_float' then
-      oc.cpu.cdhw_to_octree_sum_bwd_cpu(gradOutput.grid, dense_depth, dense_height, dense_width, self.gradInput:data())
+      oc.cpu.cdhw_to_octree_sum_bwd_cpu(gradOutput.grid, dense_depth, dense_height, dense_width, self.tr_dist, self.gradInput:data())
     elseif in_grid._type == 'oc_cuda' then
-      oc.gpu.cdhw_to_octree_sum_bwd_gpu(gradOutput.grid, dense_depth, dense_height, dense_width, self.gradInput:data())
+      oc.gpu.cdhw_to_octree_sum_bwd_gpu(gradOutput.grid, dense_depth, dense_height, dense_width, self.tr_dist, self.gradInput:data())
     end
   elseif self.fcn == 'avg' then
     if in_grid._type == 'oc_float' then
-      oc.cpu.cdhw_to_octree_avg_bwd_cpu(gradOutput.grid, dense_depth, dense_height, dense_width, self.gradInput:data())
+      oc.cpu.cdhw_to_octree_avg_bwd_cpu(gradOutput.grid, dense_depth, dense_height, dense_width, self.tr_dist, self.gradInput:data())
     elseif in_grid._type == 'oc_cuda' then
-      oc.gpu.cdhw_to_octree_avg_bwd_gpu(gradOutput.grid, dense_depth, dense_height, dense_width, self.gradInput:data())
+      oc.gpu.cdhw_to_octree_avg_bwd_gpu(gradOutput.grid, dense_depth, dense_height, dense_width, self.tr_dist, self.gradInput:data())
     end
   else
     error('unknown fcn: '..self.fcn)

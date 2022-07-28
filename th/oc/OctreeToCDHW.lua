@@ -25,9 +25,10 @@
 
 local OctreeToCDHW, parent = torch.class('oc.OctreeToCDHW', 'oc.OctreeModule')
 
-function OctreeToCDHW:__init(dense_depth, dense_height, dense_width)
+function OctreeToCDHW:__init(tr_dist, dense_depth, dense_height, dense_width)
   parent.__init(self)
 
+  self.tr_dist = tr_dist
   self.dense_depth = dense_depth
   self.dense_height = dense_height
   self.dense_width = dense_width
@@ -55,9 +56,9 @@ function OctreeToCDHW:updateOutput(input)
   if self.output:size(2) ~= input:feature_size() then error('invalid feature_size') end
 
   if input._type == 'oc_float' then
-    oc.cpu.octree_to_cdhw_cpu(input.grid, dense_depth, dense_height, dense_width, self.output:data())
+    oc.cpu.octree_to_cdhw_cpu(input.grid, dense_depth, dense_height, dense_width, self.tr_dist, self.output:data())
   elseif input._type == 'oc_cuda' then
-    oc.gpu.octree_to_cdhw_gpu(input.grid, dense_depth, dense_height, dense_width, self.output:data())
+    oc.gpu.octree_to_cdhw_gpu(input.grid, dense_depth, dense_height, dense_width, self.tr_dist, self.output:data())
   end
 
   return self.output

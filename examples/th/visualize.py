@@ -4,6 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 from math import log
+from skimage import measure
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+from matplotlib.colors import LightSource
 sys.path.append('/root/vol/octnet-completion/py/')
 import pyoctnet
 
@@ -16,7 +19,7 @@ def grid_wireframe(fig, ax, grid, f_name):
 
   levels = set()
   colors = np.zeros((grid.vx_depth(),grid.vx_height(),grid.vx_width(),3))
-  for (leaf, grid_idx, bit_idx, gd,gh,gw, bd,bh,bw, level) in pyoctnet.leaf_iterator(grid, leafs_only=False):
+  for (leaf, grid_idx, bit_idx, gd,gh,gw, bd,bh,bw, level) in pyoctnet.leaf_iterator(grid, n=4, leafs_only=False):
     x = gw * 8 + bw
     y = gh * 8 + bh
     z = gd * 8 + bd
@@ -46,10 +49,10 @@ def grid_wireframe(fig, ax, grid, f_name):
     ax.voxels(x,y,z, voxel, edgecolor=color[i], facecolors=(0,0,0,0) if i!=0 else colors)
 
 
-fig, axs = plt.subplots(1, 3, subplot_kw=dict(projection='3d'))
+fig, axs = plt.subplots(1, 4, subplot_kw=dict(projection='3d'))
 fig.set_size_inches(30, 10)
 for ax in axs:
-  ax.view_init(elev=30, azim=-30)
+  ax.view_init(elev=30, azim=60)
   plt.tight_layout()
   ax.set_xlim(0,32)
   ax.set_ylim(0,32)
@@ -61,9 +64,59 @@ for ax in axs:
   # ax._axis3don = False
   ax.dist = 10
 
-
+ls = LightSource(azdeg=225.0, altdeg=45.0)
+vxs = [0,0,0]
 for i, fname in enumerate(['input', 'output', 'target']):
   grid = pyoctnet.Octree.create_from_bin(bytes('junk/%s.oc' %fname, encoding="ascii"))
-  grid_wireframe(fig, axs[i], grid, fname)
-  print(grid.mem_using())
-fig.savefig("junk/output.jpg", dpi=300)
+  vxs[i] = grid.to_cdhw()
+  vxs[i][vxs[i]==0] = 3
+  vxs[i].dump(fname+".vx")
+
+for k in range(8):    
+  fig, axs = plt.subplots(1, 3, subplot_kw=dict(projection='3d'))
+  fig.set_size_inches(30, 10)
+  for ax in axs:
+    ax.view_init(elev=30, azim=60)
+    plt.tight_layout()
+    ax.set_xlim(0,32)
+    ax.set_ylim(0,32)
+    ax.set_zlim(0,32)
+    ax.xaxis.pane.fill = False
+    ax.yaxis.pane.fill = False
+    ax.zaxis.pane.fill = False
+    ax.grid(False)
+    # ax._axis3don = False
+    ax.dist = 10
+
+  for i, _vx in enumerate(vxs):
+    # print(_vx.shape)
+    # print(_vx.shape)
+    vx = _vx[k]
+    if i == 0:
+      vx = vx[0,:,:,:]
+    # print(vx.shape)
+    vx = np.transpose(vx, axes=(0,2,1))
+    # vx[:,:]
+    verts, faces, normals, values = measure.marching_cubes(vx, 1.0)
+    ax = axs[i]
+    
+    mesh = Poly3DCollection(verts[faces], linewidths=0, alpha=1.0)
+    mesh.set_edgecolor((0,0,0,0))
+    
+    normalsarray = np.array([np.array((np.sum(normals[face[:], 0]/3), np.sum(normals[face[:], 1]/3), np.sum(normals[face[:], 2]/3))/np.sqrt(np.sum(normals[face[:], 0]/3)**2 + np.sum(normals[face[:], 1]/3)**2 + np.sum(normals[face[:], 2]/3)**2)) for face in faces])
+    min = np.min(ls.shade_normals(normalsarray, fraction=1.0)) # min shade value
+    max = np.max(ls.shade_normals(normalsarray, fraction=1.0)) # max shade value
+    diff = max-min
+    newMin = 0.3
+    newMax = 0.95
+    newdiff = newMax-newMin
+    colourRGB = np.array((245/255., 245/255., 220/255., 1.0))
+    rgbNew = np.array([colourRGB*(newMin + newdiff*((shade-min)/diff)) for shade in ls.shade_normals(normalsarray, fraction=1.0)])
+    mesh.set_facecolor(rgbNew)
+
+    # ax.voxels(vx, edgecolor=((245/255., 245/255., 220/255., 0.3)), facecolors=colourRGB)
+    ax.add_collection3d(mesh)
+
+  print(k)
+  fig.savefig("junk/output%d.jpg" %k, dpi=300)  
+    # print(grid.mem_using())

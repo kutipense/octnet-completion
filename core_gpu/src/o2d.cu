@@ -28,7 +28,7 @@
 
 
 template <int dense_format, bool avg_vol>
-__global__ void kernel_octree_to_dense(ot_data_t* out_data, int n_voxels, const int dense_depth, const int dense_height, const int dense_width, const octree grid) {
+__global__ void kernel_octree_to_dense(ot_data_t* out_data, int n_voxels, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, const octree grid) {
   const int vx_depth_off = (dense_depth - grid.grid_depth * 8) / 2;
   const int vx_height_off = (dense_height - grid.grid_height * 8) / 2;
   const int vx_width_off = (dense_width - grid.grid_width * 8) / 2;
@@ -67,7 +67,7 @@ __global__ void kernel_octree_to_dense(ot_data_t* out_data, int n_voxels, const 
         else if(dense_format == DENSE_FORMAT_CDHW) {
           out_idx = (((n * feature_size + f) * dense_depth + d) * dense_height + h) * dense_width + w;
         }
-        out_data[out_idx] = 0;
+        out_data[out_idx] = tr_dist;
       }
     }
     else {
@@ -106,7 +106,7 @@ __global__ void kernel_octree_to_dense(ot_data_t* out_data, int n_voxels, const 
 }
 
 
-void octree_to_dhwc_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* out_data) {
+void octree_to_dhwc_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* out_data) {
   if(DEBUG) { printf("[DEBUG] octree_to_dhwc_gpu\n"); }
   if(dense_depth < grid_d->grid_depth * 8 || dense_height < grid_d->grid_height * 8 || dense_width < grid_d->grid_width * 8) {
     printf("[ERROR] dense dim (%d,%d,%d) is smaller then dim of grid (%d,%d,%d)\n", 
@@ -116,12 +116,12 @@ void octree_to_dhwc_gpu(const octree* grid_d, const int dense_depth, const int d
 
   int n_voxels = grid_d->n * dense_depth * dense_height * dense_width;
   kernel_octree_to_dense<DENSE_FORMAT_DHWC, false><<<GET_BLOCKS(n_voxels), CUDA_NUM_THREADS>>>(
-      out_data, n_voxels, dense_depth, dense_height, dense_width, *grid_d
+      out_data, n_voxels, dense_depth, dense_height, dense_width, tr_dist, *grid_d
   );
   CUDA_POST_KERNEL_CHECK;
 }
 
-void octree_to_cdhw_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* out_data) {
+void octree_to_cdhw_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* out_data) {
   if(DEBUG) { printf("[DEBUG] octree_to_cdhw_gpu\n"); }
   if(dense_depth < grid_d->grid_depth * 8 || dense_height < grid_d->grid_height * 8 || dense_width < grid_d->grid_width * 8) {
     printf("[ERROR] dense dim (%d,%d,%d) is smaller then dim of grid (%d,%d,%d)\n", 
@@ -131,14 +131,14 @@ void octree_to_cdhw_gpu(const octree* grid_d, const int dense_depth, const int d
 
   int n_voxels = grid_d->n * dense_depth * dense_height * dense_width;
   kernel_octree_to_dense<DENSE_FORMAT_CDHW, false><<<GET_BLOCKS(n_voxels), CUDA_NUM_THREADS>>>(
-      out_data, n_voxels, dense_depth, dense_height, dense_width, *grid_d
+      out_data, n_voxels, dense_depth, dense_height, dense_width, tr_dist, *grid_d
   );
   CUDA_POST_KERNEL_CHECK;
 }
 
 
 
-void octree_to_dhwc_avg_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* out_data) {
+void octree_to_dhwc_avg_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* out_data) {
   if(DEBUG) { printf("[DEBUG] octree_to_dhwc_avg_gpu\n"); }
   if(dense_depth < grid_d->grid_depth * 8 || dense_height < grid_d->grid_height * 8 || dense_width < grid_d->grid_width * 8) {
     printf("[ERROR] dense dim (%d,%d,%d) is smaller then dim of grid (%d,%d,%d)\n", 
@@ -148,12 +148,12 @@ void octree_to_dhwc_avg_gpu(const octree* grid_d, const int dense_depth, const i
 
   int n_voxels = grid_d->n * dense_depth * dense_height * dense_width;
   kernel_octree_to_dense<DENSE_FORMAT_DHWC, true><<<GET_BLOCKS(n_voxels), CUDA_NUM_THREADS>>>(
-      out_data, n_voxels, dense_depth, dense_height, dense_width, *grid_d
+      out_data, n_voxels, dense_depth, dense_height, dense_width, tr_dist, *grid_d
   );
   CUDA_POST_KERNEL_CHECK;
 }
 
-void octree_to_cdwh_avg_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* out_data) {
+void octree_to_cdwh_avg_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* out_data) {
   if(DEBUG) { printf("[DEBUG] octree_to_cdwh_avg_gpu\n"); }
   if(dense_depth < grid_d->grid_depth * 8 || dense_height < grid_d->grid_height * 8 || dense_width < grid_d->grid_width * 8) {
     printf("[ERROR] dense dim (%d,%d,%d) is smaller then dim of grid (%d,%d,%d)\n", 
@@ -163,7 +163,7 @@ void octree_to_cdwh_avg_gpu(const octree* grid_d, const int dense_depth, const i
 
   int n_voxels = grid_d->n * dense_depth * dense_height * dense_width;
   kernel_octree_to_dense<DENSE_FORMAT_CDHW, true><<<GET_BLOCKS(n_voxels), CUDA_NUM_THREADS>>>(
-      out_data, n_voxels, dense_depth, dense_height, dense_width, *grid_d
+      out_data, n_voxels, dense_depth, dense_height, dense_width, tr_dist, *grid_d
   );
   CUDA_POST_KERNEL_CHECK;
 }

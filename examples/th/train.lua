@@ -35,15 +35,15 @@ function train_epoch(opt, data_loader)
       local saved = false
       if(f < opt.min_loss) then
         opt.min_loss = f
-        local net_path = 'models/best.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
-        torch.save(net_path, opt.net:clearState())
+        -- local net_path = 'models/best.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
+        -- torch.save(net_path, opt.net:clearState())
     
-        local state_path = 'models/state.t7'
-        if not opt.state_save_interval or opt.epoch % opt.state_save_interval == 0 then
-          opt.net = opt.net:clearState()
-          torch.save(state_path, opt)
-        end
-        saved = true
+        -- local state_path = 'models/state.t7'
+        -- if not opt.state_save_interval or opt.epoch % opt.state_save_interval == 0 then
+        --   opt.net = opt.net:clearState()
+        --   torch.save(state_path, opt)
+        -- end
+        -- saved = true
       end
 
 

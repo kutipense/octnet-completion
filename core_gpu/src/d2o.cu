@@ -179,38 +179,38 @@ void cdhw_to_octree_max_gpu(const octree* grid_d_in, const int dense_depth, cons
 
 
 
-void dhwc_to_octree_sum_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* grad_in_data) {
+void dhwc_to_octree_sum_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* grad_in_data) {
   if(DEBUG) { printf("[DEBUG] dhwc_to_octree_sum_bwd_gpu\n"); }
   int n_voxels = grad_out_grid_d->n * dense_depth * dense_height * dense_width;
   kernel_octree_to_dense<DENSE_FORMAT_DHWC, false><<<GET_BLOCKS(n_voxels), CUDA_NUM_THREADS>>>(
-      grad_in_data, n_voxels, dense_depth, dense_height, dense_width, *grad_out_grid_d
+      grad_in_data, n_voxels, dense_depth, dense_height, dense_width, tr_dist, *grad_out_grid_d
   );
   CUDA_POST_KERNEL_CHECK;
 }
-void cdhw_to_octree_sum_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* grad_in_data) {
+void cdhw_to_octree_sum_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* grad_in_data) {
   if(DEBUG) { printf("[DEBUG] cdhw_to_octree_sum_bwd_gpu\n"); }
   int n_voxels = grad_out_grid_d->n * dense_depth * dense_height * dense_width;
   kernel_octree_to_dense<DENSE_FORMAT_CDHW, false><<<GET_BLOCKS(n_voxels), CUDA_NUM_THREADS>>>(
-      grad_in_data, n_voxels, dense_depth, dense_height, dense_width, *grad_out_grid_d
+      grad_in_data, n_voxels, dense_depth, dense_height, dense_width, tr_dist, *grad_out_grid_d
   );
   CUDA_POST_KERNEL_CHECK;
 }
 
 
 
-void dhwc_to_octree_avg_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* grad_in_data) {
+void dhwc_to_octree_avg_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* grad_in_data) {
   if(DEBUG) { printf("[DEBUG] dhwc_to_octree_avg_bwd_gpu\n"); }
   int n_voxels = grad_out_grid_d->n * dense_depth * dense_height * dense_width;
   kernel_octree_to_dense<DENSE_FORMAT_DHWC, true><<<GET_BLOCKS(n_voxels), CUDA_NUM_THREADS>>>(
-      grad_in_data, n_voxels, dense_depth, dense_height, dense_width, *grad_out_grid_d
+      grad_in_data, n_voxels, dense_depth, dense_height, dense_width, tr_dist, *grad_out_grid_d
   );
   CUDA_POST_KERNEL_CHECK;
 }
-void cdhw_to_octree_avg_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* grad_in_data) {
+void cdhw_to_octree_avg_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* grad_in_data) {
   if(DEBUG) { printf("[DEBUG] cdhw_to_octree_avg_bwd_gpu\n"); }
   int n_voxels = grad_out_grid_d->n * dense_depth * dense_height * dense_width;
   kernel_octree_to_dense<DENSE_FORMAT_CDHW, true><<<GET_BLOCKS(n_voxels), CUDA_NUM_THREADS>>>(
-      grad_in_data, n_voxels, dense_depth, dense_height, dense_width, *grad_out_grid_d
+      grad_in_data, n_voxels, dense_depth, dense_height, dense_width, tr_dist, *grad_out_grid_d
   );
   CUDA_POST_KERNEL_CHECK;
 }

@@ -32,12 +32,12 @@
 extern "C" {
 
 // o2d
-void octree_to_dhwc_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* data);
-void octree_to_dhwc_avg_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* data);
+void octree_to_dhwc_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* data);
+void octree_to_dhwc_avg_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* data);
 void octree_to_dhwc_bwd_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, const ot_data_t* grad_data, octree* grad_grid_d);
 
-void octree_to_cdhw_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* data);
-void octree_to_cdhw_avg_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* data);
+void octree_to_cdhw_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* data);
+void octree_to_cdhw_avg_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* data);
 void octree_to_cdhw_bwd_gpu(const octree* grid_d, const int dense_depth, const int dense_height, const int dense_width, const ot_data_t* grad_data, octree* grad_grid_d);
 
 
@@ -45,20 +45,20 @@ void octree_to_cdhw_bwd_gpu(const octree* grid_d, const int dense_depth, const i
 void dhwc_to_octree_sum_gpu(const octree* grid_d_in, const int dense_depth, const int dense_height, const int dense_width, const ot_data_t* data, int feature_size, octree* grid_d);
 void dhwc_to_octree_avg_gpu(const octree* grid_d_in, const int dense_depth, const int dense_height, const int dense_width, const ot_data_t* data, int feature_size, octree* grid_d);
 void dhwc_to_octree_max_gpu(const octree* grid_d_in, const int dense_depth, const int dense_height, const int dense_width, const ot_data_t* data, int feature_size, octree* grid_d);
-void dhwc_to_octree_sum_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* grad_in_data);
-void dhwc_to_octree_avg_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* grad_in_data);
+void dhwc_to_octree_sum_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* grad_in_data);
+void dhwc_to_octree_avg_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* grad_in_data);
 
 void cdhw_to_octree_sum_gpu(const octree* grid_d_in, const int dense_depth, const int dense_height, const int dense_width, const ot_data_t* data, int feature_size, octree* grid_d);
 void cdhw_to_octree_avg_gpu(const octree* grid_d_in, const int dense_depth, const int dense_height, const int dense_width, const ot_data_t* data, int feature_size, octree* grid_d);
 void cdhw_to_octree_max_gpu(const octree* grid_d_in, const int dense_depth, const int dense_height, const int dense_width, const ot_data_t* data, int feature_size, octree* grid_d);
-void cdhw_to_octree_sum_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* grad_in_data);
-void cdhw_to_octree_avg_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t* grad_in_data);
+void cdhw_to_octree_sum_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* grad_in_data);
+void cdhw_to_octree_avg_bwd_gpu(const octree* grad_out_grid_d, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, ot_data_t* grad_in_data);
 
 } // extern "C"
 
 
 template <int dense_format, bool avg_vol>
-__global__ void kernel_octree_to_dense(ot_data_t* out_data, int n_voxels, const int dense_depth, const int dense_height, const int dense_width, const octree grid_d);
+__global__ void kernel_octree_to_dense(ot_data_t* out_data, int n_voxels, const int dense_depth, const int dense_height, const int dense_width, ot_data_t tr_dist, const octree grid_d);
 
 
 #endif

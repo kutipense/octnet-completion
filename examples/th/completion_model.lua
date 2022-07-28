@@ -19,7 +19,7 @@ local function create_model(opt)
         :add(oc.OctreeGridPool2x2x2('max'))
         :add(oc.OctreeLeakyReLU(negative_slope, true))
     conversion16x16x16 = nn.Sequential()
-        :add(oc.OctreeToCDHW()) -- convert to dense
+        :add(oc.OctreeToCDHW(opt.tr_dist)) -- convert to dense
     -- 16x16x16
     conv2 = nn.Sequential()
         :add(oc.OctreeConvolutionMM(num_features, num_features * 2))
@@ -27,11 +27,11 @@ local function create_model(opt)
         :add(oc.OctreeBatchNormalizationSS(num_features * 2))
         :add(oc.OctreeLeakyReLU(negative_slope, true))
     conversion8x8x8 = nn.Sequential()
-        :add(oc.OctreeToCDHW()) -- convert to dense
+        :add(oc.OctreeToCDHW(opt.tr_dist)) -- convert to dense
     -- 8x8x8
     conv3 = nn.Sequential()
         :add(oc.OctreeConvolutionMM(num_features * 2, num_features * 4))
-        :add(oc.OctreeToCDHW()) --convert to dense
+        :add(oc.OctreeToCDHW(opt.tr_dist)) --convert to dense
         :add(cudnn.VolumetricMaxPooling(2, 2, 2, 2, 2, 2))
         :add(cudnn.VolumetricBatchNormalization(num_features * 4))
         :add(nn.LeakyReLU(negative_slope, true))
