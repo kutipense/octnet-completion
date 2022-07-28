@@ -35,15 +35,17 @@ function train_epoch(opt, data_loader)
       local saved = false
       if(f < opt.min_loss) then
         opt.min_loss = f
-        -- local net_path = 'models/best.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
-        -- torch.save(net_path, opt.net:clearState())
-    
-        -- local state_path = 'models/state.t7'
-        -- if not opt.state_save_interval or opt.epoch % opt.state_save_interval == 0 then
-        --   opt.net = opt.net:clearState()
-        --   torch.save(state_path, opt)
-        -- end
-        -- saved = true
+        if(batch_idx%100==0) then
+          local net_path = string.format('models/best%03d.t7', opt.epoch) --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
+          torch.save(net_path, opt.net:clearState())
+      
+          local state_path = 'models/state.t7'
+          if not opt.state_save_interval or opt.epoch % opt.state_save_interval == 0 then
+            opt.net = opt.net:clearState()
+            torch.save(state_path, opt)
+          end
+          saved = true        
+        end
       end
 
 
@@ -116,7 +118,7 @@ function worker(opt, train_data_loader, test_data_loader)
     train_epoch(opt, train_data_loader)
 
     -- save network
-    if epoch % 20 == 0 then
+    if epoch % 1 == 0 then
       print('[INFO] saving progress')
       local net_path = string.format('models/net_epoch%03d.t7', opt.epoch) --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
       torch.save(net_path, opt.net:clearState())
