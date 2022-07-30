@@ -1,5 +1,38 @@
 #!/usr/bin/env th
 
+
+function split_target(target)
+  local tmp_oc2 = oc.FloatOctree():cuda()
+  local tmp_oc3 = oc.FloatOctree():cuda()
+  local tmp_oc4 = oc.FloatOctree():cuda()
+  oc.gpu.octree_pool2x2x2_max_gpu(target.grid, false, false, true, tmp_oc2.grid)
+  oc.gpu.octree_pool2x2x2_max_gpu(tmp_oc2.grid, false, true, false, tmp_oc3.grid)
+  oc.gpu.octree_pool2x2x2_max_gpu(tmp_oc3.grid, true, false, false, tmp_oc4.grid)
+
+  tmp_oc2:to_occupancy()
+  tmp_oc3:to_occupancy()
+  tmp_oc4:to_occupancy()
+
+  ------ l1       l2       l3
+  return tmp_oc4, tmp_oc3, tmp_oc2
+end
+
+function get_loss(criterion, output, target)
+  local tmp_oc = oc.FloatOctree():cuda()
+  oc.gpu.octree_split_by_prob_gpu(output[#output].grid, output[#output].grid, 0.5, true, tmp_oc.grid)
+  output[#output] = tmp_oc
+
+  local f = {}
+  local dfdx = {}
+
+  for i, c in ipairs(criterion) do
+    f[i] = c:forward(output[i], target[i])
+    dfdx[i] = c:backward(output[i], target[i]):cuda() --:mul(#criterion - i + 1)
+  end
+
+  return f, dfdx
+end
+
 function train_epoch(opt, data_loader)
   local net = opt.net or error('no net in train_epoch')
   local criterion = opt.criterion or error('no criterion in train_epoch')
@@ -17,28 +50,24 @@ function train_epoch(opt, data_loader)
 
       local _input, _target = data_loader:getBatch()
       local input = oc.FloatOctree():octree_create_from_dense_features_batch(_input, opt.tr_dist):cuda()
+      local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
      
-      _target = torch.log(torch.abs(_target) + 1)
-      _target = _target:cuda()
+      local l1, l2, l3 = split_target(target)
+      target:to_occupancy()
       
       local output = net:forward(input)
+      local f, dfdx = get_loss(criterion, output, {l1, l2, l3, target})
       
-      local mask = torch.eq(_input[{ {},{},{},{},2}], 1)
-      _target[mask] = 0
-      output[mask] = 0
-      
-      local f = criterion:forward(output, _target)
-      local dfdx = criterion:backward(output, _target):cuda()
-
+      -- print(f, dfdx)
       net:backward(input, dfdx)
-
+      
       local saved = false
-      if(f < opt.min_loss) then
-        opt.min_loss = f
-        -- local net_path = 'models/best.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
+      if(f[#f] < opt.min_loss) then
+        opt.min_loss = f[#f]
+        -- local net_path = 'struct_models/best.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
         -- torch.save(net_path, opt.net:clearState())
     
-        -- local state_path = 'models/state.t7'
+        -- local state_path = 'struct_models/state.t7'
         -- if not opt.state_save_interval or opt.epoch % opt.state_save_interval == 0 then
         --   opt.net = opt.net:clearState()
         --   torch.save(state_path, opt)
@@ -49,7 +78,7 @@ function train_epoch(opt, data_loader)
 
       if batch_idx < 129 or batch_idx % math.floor((n_batches / 200)) == 0 then
         print(
-          string.format('epoch=%2d | iter=%4d | loss=%9.6f ', opt.epoch, batch_idx, f) ..  ( saved and 'saved' or ''))
+          string.format('epoch=%2d | iter=%4d | loss=%9.6f, %9.6f, %9.6f, %9.6f', opt.epoch, batch_idx, table.unpack(f)) ..  ( saved and 'saved' or ''))
       end
 
       return f, grad_parameters
@@ -71,31 +100,25 @@ function test_epoch(opt, data_loader)
   local accuracy = 0
   local n_samples = 0
   for batch_idx = 1, n_batches do
-
-    local _input, target = data_loader:getBatch()
+    local _input, _target = data_loader:getBatch()
     local input = oc.FloatOctree():octree_create_from_dense_features_batch(_input, opt.tr_dist):cuda()
+    local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
     
-    target = target:cuda()
-
+    target:to_occupancy()
+    
     local output = net:forward(input)
-    output = torch.exp(output) - 1
-    output = output:cuda()
-
-    local mask = torch.eq(_input[{ {},{},{},{},2}], 1)
-    target[mask] = 0
-    output[mask] = 0
     
-    avg_f = avg_f + criterion:forward(output, target)
+    avg_f = avg_f + criterion:forward(output[#output], target)
   end
 
   avg_f = avg_f / n_batches
 
   if(avg_f < opt.best_val) then
     opt.best_val = avg_f
-    local net_path = 'models/best.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
+    local net_path = 'struct_models/best.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
     torch.save(net_path, opt.net:clearState())
 
-    local state_path = 'models/state.t7'
+    local state_path = 'struct_models/state.t7'
     if not opt.state_save_interval or opt.epoch % opt.state_save_interval == 0 then
       opt.net = opt.net:clearState()
       torch.save(state_path, opt)
@@ -126,11 +149,11 @@ function worker(opt, train_data_loader, test_data_loader)
     -- save network
     if epoch % 20 == 0 then
       print('[INFO] saving progress')
-      local net_path = string.format('models/net_epoch%03d.t7', opt.epoch) --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
+      local net_path = string.format('struct_models/net_epoch%03d.t7', opt.epoch) --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
       torch.save(net_path, opt.net:clearState())
   
       -- save state
-      local state_path = 'models/state.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
+      local state_path = 'struct_models/state.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
       if not opt.state_save_interval or opt.epoch % opt.state_save_interval == 0 then
         opt.net = opt.net:clearState()
         torch.save(state_path, opt)
@@ -138,7 +161,7 @@ function worker(opt, train_data_loader, test_data_loader)
       print('[INFO] progress saved to: ' .. net_path)
     end
 
-    test_epoch(opt, test_data_loader)
+    -- test_epoch(opt, test_data_loader)
     
     -- clean up
     collectgarbage('collect')
@@ -157,5 +180,6 @@ end
 return {
   train_epoch = train_epoch,
   test_epoch = test_epoch,
+  split_target = split_target,
   worker = worker
 }

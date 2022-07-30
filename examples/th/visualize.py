@@ -13,13 +13,13 @@ import pyoctnet
 def NormalizeData(data):
     return (data - np.min(data)) / (np.max(data) - np.min(data)+1e-6)
 
-def grid_wireframe(fig, ax, grid, f_name):  
+def grid_wireframe(ax, grid):  
   voxels = [np.zeros((grid.vx_depth()//2**i,grid.vx_height()//2**i,grid.vx_width()//2**i))
      for i in range(0,4)]
 
   levels = set()
   colors = np.zeros((grid.vx_depth(),grid.vx_height(),grid.vx_width(),3))
-  for (leaf, grid_idx, bit_idx, gd,gh,gw, bd,bh,bw, level) in pyoctnet.leaf_iterator(grid, n=4, leafs_only=False):
+  for (leaf, grid_idx, bit_idx, gd,gh,gw, bd,bh,bw, level) in pyoctnet.leaf_iterator(grid, leafs_only=False):
     x = gw * 8 + bw
     y = gh * 8 + bh
     z = gd * 8 + bd
@@ -72,7 +72,7 @@ for i, fname in enumerate(['input', 'output', 'target']):
   vxs[i][vxs[i]==0] = 3
   vxs[i].dump(fname+".vx")
 
-for k in range(8):    
+for k in range(1):    
   fig, axs = plt.subplots(1, 3, subplot_kw=dict(projection='3d'))
   fig.set_size_inches(30, 10)
   for ax in axs:
@@ -89,9 +89,8 @@ for k in range(8):
     ax.dist = 10
 
   for i, _vx in enumerate(vxs):
-    # print(_vx.shape)
-    # print(_vx.shape)
-    vx = _vx[k]
+    vx = _vx#[k]
+    print(vx.shape)
     if i == 0:
       vx = vx[0,:,:,:]
     # print(vx.shape)
@@ -113,9 +112,10 @@ for k in range(8):
     colourRGB = np.array((245/255., 245/255., 220/255., 1.0))
     rgbNew = np.array([colourRGB*(newMin + newdiff*((shade-min)/diff)) for shade in ls.shade_normals(normalsarray, fraction=1.0)])
     mesh.set_facecolor(rgbNew)
+    ax.add_collection3d(mesh)
 
     # ax.voxels(vx, edgecolor=((245/255., 245/255., 220/255., 0.3)), facecolors=colourRGB)
-    ax.add_collection3d(mesh)
+    # grid_wireframe(axs[i],vx)
 
   print(k)
   fig.savefig("junk/output%d.jpg" %k, dpi=300)  

@@ -469,6 +469,160 @@ void octree_nll_loss_bwd_gpu(const octree* input, const octree* target, const ot
 
 #define EPS 1e-12
 
+
+struct octree_bce_loss_level_from_leaf_idx : public thrust::unary_function<int, float2> {
+  const octree input;
+  const octree target;
+  ot_data_t level;
+  
+  octree_bce_loss_level_from_leaf_idx(const octree input_, const octree target_, ot_data_t level_) : 
+      input(input_), target(target_), level(level_) {
+  }
+
+  __host__ __device__ float2 operator()(const int leaf_idx) {
+    const int in_grid_idx = leaf_idx_to_grid_idx(&input, leaf_idx);
+    const ot_tree_t* in_tree = octree_get_tree(&input, in_grid_idx);
+
+    int in_data_idx = leaf_idx - input.prefix_leafs[in_grid_idx];
+    int in_bit_idx = data_idx_to_bit_idx(in_tree, in_data_idx);
+
+    int n,ds,hs,ws;
+    int depth = octree_ind_to_dense_ind(&input, in_grid_idx, in_bit_idx, &n, &ds,&hs,&ws);
+    int width = width_from_depth(depth);
+    
+    if (depth != level) return ((float2) {0 , 1});
+
+    ot_data_t grid_out = 0;
+    ot_data_t grid_weight = 0;
+    for(int d = ds; d < (ds+width); ++d) {
+      for(int h = hs; h < (hs+width); ++h) {
+        for(int w = ws; w < (ws+width); ++w) {
+          int gd = d / 8;
+          int gh = h / 8;
+          int gw = w / 8;
+          int bd = d % 8;
+          int bh = h % 8;
+          int bw = w % 8;
+          int ta_grid_idx = octree_grid_idx(&target, n, gd,gh,gw);
+          const ot_tree_t* ta_tree = octree_get_tree(&target, ta_grid_idx);
+          int ta_bit_idx = tree_bit_idx(ta_tree, bd,bh,bw);
+          int ta_data_idx = tree_data_idx(ta_tree, ta_bit_idx, target.feature_size);
+          const ot_data_t* ta_data = octree_get_data(&target, ta_grid_idx);
+          for(int f = 0; f < input.feature_size; ++f) {
+            ot_data_t x = input.data[leaf_idx * input.feature_size + f];
+            ot_data_t y = ta_data[ta_data_idx + f];
+            grid_out += (log(x + EPS) * y + log(1. - x + EPS) * (1. - y));
+            grid_weight += 1;
+          }
+        }
+      }
+    } 
+
+    float2 ret;
+    ret.x = -grid_out;
+    ret.y = grid_weight;
+    return ret;
+  }
+};
+
+extern "C"
+void octree_bce_loss_level_gpu(const octree* input, const octree* target, bool size_average, ot_data_t level, ot_data_t* output, ot_data_t* total_weight) {
+  if(!octree_equal_shape(input, target)) {
+    printf("[ERROR] bce_ds_loss - shape of inputs do not match\n");
+    exit(-1);
+  }
+
+  float2 init;
+  init.x = 0;
+  init.y = 0;
+  thrust::counting_iterator<int> iter(0);
+  float2 ret = thrust::transform_reduce(
+    thrust::device, iter, iter + input->n_leafs, 
+    octree_bce_loss_level_from_leaf_idx(*input, *target, level), 
+    init, octree_plus_float2_bfcn());
+
+  if(size_average) {
+    *total_weight = ret.y;
+    *output = ret.x / ret.y ;
+  }
+  else {
+    *output = ret.x;
+    *total_weight = 1;
+  }
+}
+
+
+__global__ void kernel_bce_loss_level_bwd(octree grad, int n_leafs, const octree input, const octree target, ot_data_t level, const ot_data_t norm) {
+  
+  CUDA_KERNEL_LOOP(leaf_idx, n_leafs) {
+    const int in_grid_idx = grad.data[leaf_idx * grad.feature_size];
+    const ot_tree_t* in_tree = octree_get_tree(&input, in_grid_idx);
+
+    int in_data_idx = leaf_idx - input.prefix_leafs[in_grid_idx];
+    int in_bit_idx = data_idx_to_bit_idx(in_tree, in_data_idx);
+
+    int n,ds,hs,ws;
+    int depth = octree_ind_to_dense_ind(&input, in_grid_idx, in_bit_idx, &n, &ds,&hs,&ws);
+    int width = width_from_depth(depth);
+    
+    for(int f = 0; f < grad.feature_size; ++f) {
+      grad.data[leaf_idx * grad.feature_size + f] = 0;
+    }
+
+    if(depth != level) return;
+
+    for(int d = ds; d < (ds+width); ++d) {
+      for(int h = hs; h < (hs+width); ++h) {
+        for(int w = ws; w < (ws+width); ++w) {
+          int gd = d / 8;
+          int gh = h / 8;
+          int gw = w / 8;
+          int bd = d % 8;
+          int bh = h % 8;
+          int bw = w % 8;
+          int ta_grid_idx = octree_grid_idx(&target, n, gd,gh,gw);
+          const ot_tree_t* ta_tree = octree_get_tree(&target, ta_grid_idx);
+          int ta_bit_idx = tree_bit_idx(ta_tree, bd,bh,bw);
+          int ta_data_idx = tree_data_idx(ta_tree, ta_bit_idx, target.feature_size);
+          const ot_data_t* ta_data = octree_get_data(&target, ta_grid_idx);
+          for(int f = 0; f < input.feature_size; ++f) {
+            ot_data_t x = input.data[leaf_idx * input.feature_size + f];
+            ot_data_t y = ta_data[ta_data_idx + f];
+            grad.data[leaf_idx * grad.feature_size + f] -= norm  * (y - x) / ((1. - x + EPS) * (x + EPS));
+            
+          }
+        }
+      }
+    }
+  }
+}
+
+
+extern "C"
+void octree_bce_loss_level_bwd_gpu(const octree* input, const octree* target, bool size_average, ot_data_t level, ot_data_t total_weight, octree* grad) {
+  if(!octree_equal_shape(input, target)) {
+    printf("[ERROR] bce_ds_loss_bwd - shape of inputs do not match\n");
+    exit(-1);
+  }
+
+  octree_cpy_scalars(input, grad);
+  octree_resize_as_gpu(input, grad);
+  octree_cpy_trees_gpu_gpu(input, grad);
+  octree_cpy_prefix_leafs_gpu_gpu(input, grad);
+
+  ot_data_t norm = 1.0;
+  if(size_average && total_weight > 0) {
+    norm = norm / total_weight;
+  } 
+
+  octree_leaf_idx_to_grid_idx_gpu(grad, grad->feature_size, grad->data_capacity, grad->data);
+  kernel_bce_loss_level_bwd<<<GET_BLOCKS(grad->n_leafs), CUDA_NUM_THREADS>>>(
+      *grad, grad->n_leafs, *input, *target, level, norm
+  );
+  CUDA_POST_KERNEL_CHECK;
+}
+
+
 struct octree_bce_loss_from_leaf_idx : public thrust::unary_function<int, ot_data_t> {
   const octree input;
   const octree target;

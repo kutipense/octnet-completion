@@ -55,6 +55,34 @@ function OctreeSplitByProb:updateGradInput(input, gradOutput)
   return self.gradInput  
 end
 
+local OctreeSplitByProbInplace, parent = torch.class('oc.OctreeSplitByProbInplace', 'oc.OctreeModule')
+
+function OctreeSplitByProbInplace:__init(threshold, check)
+  parent.__init(self)
+  self.threshold = theshold or 0 -- 0 through a sigmoid is 0.5
+  self.check = check or false
+end
+
+function OctreeSplitByProbInplace:updateOutput(input)
+  if input._type == 'oc_float' then
+    oc.cpu.octree_split_by_prob_cpu(input.grid, input.grid, self.threshold, self.check, self.output.grid)
+  elseif input._type == 'oc_cuda' then
+    oc.gpu.octree_split_by_prob_gpu(input.grid, input.grid, self.threshold, self.check, self.output.grid)
+  end
+
+  return self.output 
+end 
+
+function OctreeSplitByProbInplace:updateGradInput(input, gradOutput)
+  if input._type == 'oc_float' then
+    oc.cpu.octree_split_bwd_cpu(input.grid, gradOutput.grid, self.gradInput.grid)
+  elseif input._type == 'oc_cuda' then
+    oc.gpu.octree_split_bwd_gpu(input.grid, gradOutput.grid, self.gradInput.grid)
+  end
+
+  return self.gradInput  
+end
+
 
 
 local OctreeSplitFull, parent = torch.class('oc.OctreeSplitFull', 'oc.OctreeModule')

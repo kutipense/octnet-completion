@@ -361,6 +361,9 @@ void octree_nll_loss_bwd_gpu(const octree* input, const octree* target, const ot
 void octree_bce_loss_gpu(const octree* input, const octree* target, bool size_average, bool check, ot_data_t* output, ot_data_t* total_weight);
 void octree_bce_loss_bwd_gpu(const octree* input, const octree* target, bool size_average, bool check, octree* grad);
 
+void octree_bce_loss_level_gpu(const octree* input, const octree* target, bool size_average, ot_data_t level, ot_data_t* output, ot_data_t* total_weight);
+void octree_bce_loss_level_bwd_gpu(const octree* input, const octree* target, bool size_average, ot_data_t level, ot_data_t total_weight, octree* grad);
+
 void octree_bce_dense_loss_gpu(const octree* input, const ot_data_t* target, bool size_average, ot_data_t* output, ot_data_t* total_weight);
 void octree_bce_dense_loss_bwd_gpu(const octree* input, const ot_data_t* target, bool size_average, octree* grad);
 
