@@ -33,7 +33,7 @@ opt.learningRate_steps = {}
 opt.optimizer = optim['adam']
 opt.criterion = {
     oc.OctreeBCELevelCriterion(true, true, 0), oc.OctreeBCELevelCriterion(true, true, 1),
-    oc.OctreeBCELevelCriterion(true, true, 2), oc.OctreeBCELevelCriterion(true, true, 3)
+    -- oc.OctreeBCELevelCriterion(true, true, 2), oc.OctreeBCELevelCriterion(true, true, 3)
 }
 opt.criterion_test = oc.OctreeBCECriterion(true, true, true)
 

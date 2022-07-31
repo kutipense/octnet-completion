@@ -36,6 +36,8 @@ void octree_concat_bwd_gpu(const octree* in1, const octree* in2, const octree* g
 void octree_concat_dense_gpu(const octree* in1, const ot_data_t* in2, ot_size_t feature_size2, octree* out);
 void octree_concat_dense_bwd_gpu(const octree* in1, const ot_data_t* in2, ot_size_t feature_size2, const octree* grad_out, bool do_grad_in2, octree* grad_in1, ot_data_t* grad_in2);
 
+void octree_concat_ds_gpu(const octree* in1, const octree* in2, octree* out);
+void octree_concat_ds_bwd_gpu(const octree* in1, const octree* in2, const octree* grad_out, bool do_grad_in2, octree* grad_in1, octree* grad_in2);
 } // extern "C"
 
 #endif 

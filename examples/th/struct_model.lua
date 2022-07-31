@@ -35,23 +35,23 @@ local function create_model(opt)
         :add(oc.OctreeConvolutionMM(num_features, 1))
         :add(oc.OctreeSigmoid(false))
 
-    conv3 = nn.Sequential()
-        :add(oc.OctreeSplitByProb(conv_p2, 0.5, false))
-        :add(oc.OctreeConvolutionMM(num_features, num_features))
-        :add(oc.OctreeLeakyReLU(negative_slope, true))
+    -- conv3 = nn.Sequential()
+    --     :add(oc.OctreeSplitByProb(conv_p2, 0.5, false))
+    --     :add(oc.OctreeConvolutionMM(num_features, num_features))
+    --     :add(oc.OctreeLeakyReLU(negative_slope, true))
 
-    conv_p3 = nn.Sequential()
-        :add(oc.OctreeConvolutionMM(num_features, num_features))
-        :add(oc.OctreeSigmoid(false))
-        :add(oc.OctreeConvolutionMM(num_features, 1))
-        :add(oc.OctreeSigmoid(false))
+    -- conv_p3 = nn.Sequential()
+    --     :add(oc.OctreeConvolutionMM(num_features, num_features))
+    --     :add(oc.OctreeSigmoid(false))
+    --     :add(oc.OctreeConvolutionMM(num_features, 1))
+    --     :add(oc.OctreeSigmoid(false))
 
-    conv4 = nn.Sequential()
-        :add(oc.OctreeSplitByProb(conv_p3, 0.5, false))
-        :add(oc.OctreeConvolutionMM(num_features, num_features))
-        :add(oc.OctreeSigmoid(false))
-        :add(oc.OctreeConvolutionMM(num_features, 1))
-        :add(oc.OctreeSigmoid(false))
+    -- conv4 = nn.Sequential()
+    --     :add(oc.OctreeSplitByProb(conv_p3, 0.5, false))
+    --     :add(oc.OctreeConvolutionMM(num_features, num_features))
+    --     :add(oc.OctreeSigmoid(false))
+    --     :add(oc.OctreeConvolutionMM(num_features, 1))
+    --     :add(oc.OctreeSigmoid(false))
     -- 32x32x32
 
     local vol = -nn.Identity()
@@ -59,11 +59,11 @@ local function create_model(opt)
     local L1_P = L1 - conv_p1
     local L2 = L1 - conv2
     local L2_P = L2 - conv_p2
-    local L3 = L2 - conv3
-    local L3_P = L3 - conv_p3
-    local L4 = L3 - conv4
+    -- local L3 = L2 - conv3
+    -- local L3_P = L3 - conv_p3
+    -- local L4 = L3 - conv4
 
-    model = nn.gModule({ vol }, { L1_P, L2_P, L3_P, L4 })
+    model = nn.gModule({ vol }, { L1_P, L2_P })
     model = require('oc_weight_init')(model, 'xavier')
     model:cuda()
     return model

@@ -84,3 +84,35 @@ function OctreeConcat:updateGradInput(input, gradOutput)
 
   return self.gradInput
 end
+
+local OctreeConcatDS, parent = torch.class('oc.OctreeConcatDS', 'oc.OctreeModule')
+
+function OctreeConcatDS:__init(do_grad_in2)
+  parent.__init(self)
+
+  if do_grad_in2 ~= nil then 
+    self.do_grad_in2 = do_grad_in2 
+  else
+    self.do_grad_in2 = true 
+  end
+
+  self.gradInput = {}
+end
+
+
+function OctreeConcatDS:updateOutput(input)
+  oc.gpu.octree_concat_ds_gpu(input[1].grid, input[2].grid, self.output.grid)
+  return self.output
+end 
+
+function OctreeConcatDS:updateGradInput(input, gradOutput)
+  self.gradInput[1] = self.gradInput[1] or input[1]:new()
+  self.gradInput[2] = self.gradInput[2] or input[2]:new()
+
+  if self.do_grad_in2 then
+    self.gradInput[2]:resizeAs(input[2])
+  end
+
+  oc.gpu.octree_concat_ds_bwd_gpu(input[1].grid, input[2].grid, gradOutput.grid, self.do_grad_in2, self.gradInput[1].grid, self.gradInput[2].grid)
+  return self.gradInput
+end

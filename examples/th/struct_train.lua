@@ -18,9 +18,9 @@ function split_target(target)
 end
 
 function get_loss(criterion, output, target)
-  local tmp_oc = oc.FloatOctree():cuda()
-  oc.gpu.octree_split_by_prob_gpu(output[#output].grid, output[#output].grid, 0.5, true, tmp_oc.grid)
-  output[#output] = tmp_oc
+  -- local tmp_oc = oc.FloatOctree():cuda()
+  -- oc.gpu.octree_split_by_prob_gpu(output[#output].grid, output[#output].grid, 0.5, true, tmp_oc.grid)
+  -- output[#output] = tmp_oc
 
   local f = {}
   local dfdx = {}
@@ -78,7 +78,7 @@ function train_epoch(opt, data_loader)
 
       if batch_idx < 129 or batch_idx % math.floor((n_batches / 200)) == 0 then
         print(
-          string.format('epoch=%2d | iter=%4d | loss=%9.6f, %9.6f, %9.6f, %9.6f', opt.epoch, batch_idx, table.unpack(f)) ..  ( saved and 'saved' or ''))
+          string.format('epoch=%2d | iter=%4d | loss=%9.6f, %9.6f', opt.epoch, batch_idx, table.unpack(f)) ..  ( saved and 'saved' or ''))
       end
 
       return f, grad_parameters

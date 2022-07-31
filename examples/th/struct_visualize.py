@@ -36,7 +36,7 @@ def grid_wireframe(ax, grid, n=0):
       grid_data = grid.get_grid_data()
       data_idx = grid.data_idx(grid_idx, bit_idx)
       sdf = (grid_data[data_idx + 0])
-      if abs(sdf) < 3 and abs(sdf) >= 0.0:
+      if abs(sdf) < 3 and abs(sdf) >= 0.5:
         voxels[ind][x//width,z_dim-z//width,y//width] = 1
         colors[ind][x//width,z_dim-z//width,y//width] = [0, abs(sdf), 1-abs(sdf)]
 
@@ -45,8 +45,8 @@ def grid_wireframe(ax, grid, n=0):
   colors = [NormalizeData(i) for i in colors]
   for i,voxel in enumerate(voxels):
     x,y,z = np.indices(np.array(voxel.shape) + 1)*2**i
-    if i==2:
-      ax.voxels(x,y,z, voxel, edgecolor=color[i], facecolors=colors[i] if i==2 else (0,0,0,0))
+    # if i==2:
+    ax.voxels(x,y,z, voxel, edgecolor=color[i], facecolors=colors[i] if i==0 else (0,0,0,0))
 
 
 fig, axs = plt.subplots(2, 3, subplot_kw=dict(projection='3d'))
@@ -67,7 +67,7 @@ for r in axs:
 
 ls = LightSource(azdeg=225.0, altdeg=45.0)
 vxs = [pyoctnet.Octree.create_from_bin(bytes('struct_junk/%s.oc' %fname, encoding="ascii")) 
-    for i, fname in enumerate(['input', 'output2', 'target2'])] # , 'output2', 'output3', 'output4', 
+    for i, fname in enumerate(['input', 'output1', 'target'])] # , 'output2', 'output3', 'output4', 
 
 
 

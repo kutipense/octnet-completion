@@ -215,3 +215,129 @@ void octree_concat_dense_bwd_gpu(const octree* in1, const ot_data_t* in2, ot_siz
   }
   CUDA_POST_KERNEL_CHECK;
 }
+
+
+__global__ void kernel_concat_ds(ot_data_t* out, int n_leafs, const octree in1, const octree in2, const ot_size_t feature_size1, const ot_size_t feature_size2, const ot_size_t feature_size_out) {
+  CUDA_KERNEL_LOOP(leaf_idx, n_leafs) {
+    octree_cpy_leaf(in1.data + leaf_idx * feature_size1, feature_size1, out + leaf_idx * feature_size_out);
+
+    int grid_idx = leaf_idx_to_grid_idx(&in1, leaf_idx);
+    const ot_tree_t* tree = octree_get_tree(&in1, grid_idx);
+
+    int cum_n_leafs = in1.prefix_leafs[grid_idx];
+    int data_idx = leaf_idx - cum_n_leafs;
+    int bit_idx = data_idx_to_bit_idx(tree, data_idx);
+
+    int n,ds,hs,ws;
+    int depth = octree_ind_to_dense_ind(&in1, grid_idx, bit_idx, &n, &ds,&hs,&ws);
+    int width = width_from_depth(depth);
+
+    for(int f = 0; f < feature_size2; ++f) {
+      ot_data_t val = 0;
+      for(int d = ds; d < ds+width; ++d) {
+        for(int h = hs; h < hs+width; ++h) {
+          for(int w = ws; w < ws+width; ++w) {
+            int gd = d / 8;
+            int gh = h / 8;
+            int gw = w / 8;
+            int bd = d % 8;
+            int bh = h % 8;
+            int bw = w % 8;
+            int ta_grid_idx = octree_grid_idx(&in2, n, gd,gh,gw);
+            const ot_tree_t* ta_tree = octree_get_tree(&in2, ta_grid_idx);
+            int ta_bit_idx = tree_bit_idx(ta_tree, bd,bh,bw);
+            int ta_data_idx = tree_data_idx(ta_tree, ta_bit_idx, feature_size2);
+            const ot_data_t* ta_data = octree_get_data(&in2, ta_grid_idx);
+            val += ta_data[ta_data_idx + f];
+          }
+        }
+      }
+      out[leaf_idx * feature_size_out + feature_size1 + f] = val / (width*width*width);
+    }
+  }
+}
+
+void octree_concat_ds_gpu(const octree* in1, const octree* in2, octree* out) {
+  if(DEBUG) { printf("[DEBUG] octree_concat_ds_gpu\n"); }
+
+  ot_size_t feature_size1 = in1->feature_size;
+  ot_size_t feature_size2 = in2->feature_size;
+  ot_size_t feature_size_out = feature_size1 + feature_size2;
+
+  octree_resize_gpu(in1->n, in1->grid_depth, in1->grid_height, in1->grid_width, feature_size_out, in1->n_leafs, out);
+  octree_cpy_trees_gpu_gpu(in1, out);
+  octree_cpy_prefix_leafs_gpu_gpu(in1, out);
+
+  kernel_concat_ds<<<GET_BLOCKS(in1->n_leafs), CUDA_NUM_THREADS>>>(
+      out->data, in1->n_leafs, *in1, *in2, feature_size1, feature_size2, feature_size_out
+  );
+  CUDA_POST_KERNEL_CHECK;
+}
+
+
+template <bool do_grad_in2>
+__global__ void kernel_concat_ds_bwd(ot_data_t* grad_in1, octree grad_in2, int n_leafs, const octree grad_out, const ot_size_t feature_size1, const ot_size_t feature_size2, const ot_size_t feature_size_out) {
+  CUDA_KERNEL_LOOP(leaf_idx, n_leafs) {
+    octree_cpy_leaf(grad_out.data + leaf_idx * feature_size_out, feature_size1, grad_in1 + leaf_idx * feature_size1);
+
+    if(do_grad_in2) {
+      int grid_idx = leaf_idx_to_grid_idx(&grad_out, leaf_idx);
+      const ot_tree_t* tree = octree_get_tree(&grad_out, grid_idx);
+
+      int cum_n_leafs = grad_out.prefix_leafs[grid_idx];
+      int data_idx = leaf_idx - cum_n_leafs;
+      int bit_idx = data_idx_to_bit_idx(tree, data_idx);
+
+      int n,ds,hs,ws;
+      int depth = octree_ind_to_dense_ind(&grad_out, grid_idx, bit_idx, &n, &ds,&hs,&ws);
+      int width = width_from_depth(depth);
+
+      for(int f = 0; f < feature_size2; ++f) {
+        ot_data_t val = grad_out.data[leaf_idx * grad_out.feature_size + feature_size1 + f];
+        for(int d = ds; d < ds+width; ++d) {
+          for(int h = hs; h < hs+width; ++h) {
+            for(int w = ws; w < ws+width; ++w) {
+              int gd = d / 8;
+              int gh = h / 8;
+              int gw = w / 8;
+              int bd = d % 8;
+              int bh = h % 8;
+              int bw = w % 8;
+              int ta_grid_idx = octree_grid_idx(&grad_in2, n, gd,gh,gw);
+              const ot_tree_t* ta_tree = octree_get_tree(&grad_in2, ta_grid_idx);
+              int ta_bit_idx = tree_bit_idx(ta_tree, bd,bh,bw);
+              int ta_data_idx = tree_data_idx(ta_tree, ta_bit_idx, feature_size2);
+              ot_data_t* ta_data = octree_get_data(&grad_in2, ta_grid_idx);
+              ta_data[ta_data_idx + f] = val;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+void octree_concat_ds_bwd_gpu(const octree* in1, const octree* in2, const octree* grad_out, bool do_grad_in2, octree* grad_in1, octree* grad_in2) {
+  if(DEBUG) { printf("[DEBUG] octree_concat_ds_bwd_gpu\n"); }
+
+  octree_resize_as_gpu(in1, grad_in1);
+  octree_cpy_trees_gpu_gpu(in1, grad_in1);
+  octree_cpy_prefix_leafs_gpu_gpu(in1, grad_in1);
+  
+  ot_size_t feature_size1 = in1->feature_size;
+  ot_size_t feature_size2 = in2->feature_size;
+  ot_size_t feature_size_out = feature_size1 + feature_size2;
+
+  if(do_grad_in2) {
+    kernel_concat_ds_bwd<true><<<GET_BLOCKS(in1->n_leafs), CUDA_NUM_THREADS>>>(
+       grad_in1->data, *grad_in2, in1->n_leafs, *grad_out, feature_size1, feature_size2, feature_size_out
+    );
+  }
+  else {
+    kernel_concat_ds_bwd<false><<<GET_BLOCKS(in1->n_leafs), CUDA_NUM_THREADS>>>(
+       grad_in1->data, *grad_in2, in1->n_leafs, *grad_out, feature_size1, feature_size2, feature_size_out
+    );
+
+  }
+  CUDA_POST_KERNEL_CHECK;
+}
