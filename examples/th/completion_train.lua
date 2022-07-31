@@ -62,15 +62,6 @@ function train_epoch(opt, data_loader)
       local saved = false
       if (f[#f] < opt.min_loss) then
         opt.min_loss = f[#f]
-        -- local net_path = 'models/best.t7' --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
-        -- torch.save(net_path, opt.net:clearState())
-
-        -- local state_path = 'models/state.t7'
-        -- if not opt.state_save_interval or opt.epoch % opt.state_save_interval == 0 then
-        --   opt.net = opt.net:clearState()
-        --   torch.save(state_path, opt)
-        -- end
-        -- saved = true
       end
 
 
@@ -100,20 +91,12 @@ function test_epoch(opt, data_loader)
   local n_samples = 0
   for batch_idx = 1, n_batches do
 
-    local _input, target = data_loader:getBatch()
+    local _input, _target = data_loader:getBatch()
     local input = oc.FloatOctree():octree_create_from_dense_features_batch(_input, opt.tr_dist):cuda()
-
-    target = target:cuda()
+    local target = oc.FloatOctree():octree_create_from_dense_features_batch(_target, opt.tr_dist):cuda()
 
     local output = net:forward(input)
-    output = torch.exp(output) - 1
-    output = output:cuda()
-
-    local mask = torch.eq(_input[{ {}, {}, {}, {}, 2 }], 1)
-    target[mask] = 0
-    output[mask] = 0
-
-    avg_f = avg_f + criterion:forward(output, target)
+    avg_f = avg_f + criterion:forward(output[#output], target)
   end
 
   avg_f = avg_f / n_batches
@@ -152,7 +135,7 @@ function worker(opt, train_data_loader, test_data_loader)
     train_epoch(opt, train_data_loader)
 
     -- save network
-    if epoch % 10 == 0 then
+    if epoch % 1 == 0 then
       print('[INFO] saving progress')
       local net_path = string.format('models/net_epoch%03d.t7', opt.epoch) --paths.concat(opt.out_root, string.format('net_epoch%03d.t7', opt.epoch))
       torch.save(net_path, opt.net:clearState())
@@ -166,7 +149,7 @@ function worker(opt, train_data_loader, test_data_loader)
       print('[INFO] progress saved to: ' .. net_path)
     end
 
-    -- test_epoch(opt, test_data_loader)
+    test_epoch(opt, test_data_loader)
 
     -- clean up
     collectgarbage('collect')
