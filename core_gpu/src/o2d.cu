@@ -75,6 +75,7 @@ __global__ void kernel_octree_to_dense(ot_data_t* out_data, int n_voxels, const 
 
       const ot_tree_t* tree = octree_get_tree(&grid, grid_idx);
       int bit_idx = tree_bit_idx(tree, bd, bh, bw); 
+      int _bit_idx = tree_bit_idx_(bd, bh, bw);
       int data_idx = tree_data_idx(tree, bit_idx, feature_size);
       // const ot_data_t* data = grid.data_ptrs[grid_idx] + data_idx; 
       const ot_data_t* data = octree_get_data(&grid, grid_idx) + data_idx;
@@ -97,7 +98,12 @@ __global__ void kernel_octree_to_dense(ot_data_t* out_data, int n_voxels, const 
           out_data[out_idx] = val / vol;
         } 
         else{
-          out_data[out_idx] = val;
+          if(bit_idx == _bit_idx){
+            out_data[out_idx] = val;
+          } else {
+            out_data[out_idx] = tr_dist;
+          }
+          
         }
       }
     }
