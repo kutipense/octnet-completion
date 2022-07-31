@@ -104,3 +104,59 @@ function CDHWToOctree:updateGradInput(input, gradOutput)
 
   return self.gradInput
 end
+
+local CDHWToOctreeByInput, parent = torch.class('oc.CDHWToOctreeByInput', 'oc.OctreeModule')
+
+function CDHWToOctreeByInput:__init(tr_dist)
+  parent.__init(self)
+
+  self.tr_dist = tr_dist
+  self.gradInput = torch.FloatTensor()
+end
+
+function CDHWToOctreeByInput:updateOutput(input)
+  local in_dense = input
+  if not in_dense:isContiguous() then error('input is not contiguous') end 
+
+  local feature_size, dense_depth, dense_height, dense_width 
+  if in_dense:nDimension() == 4 then
+    feature_size, dense_depth, dense_height, dense_width = in_dense:size(1), in_dense:size(2), in_dense:size(3), in_dense:size(4)
+    in_dense = in_dense:view(1, feature_size, dense_depth, dense_height, dense_width)
+  elseif in_dense:nDimension() == 5 then
+    feature_size, dense_depth, dense_height, dense_width = in_dense:size(2), in_dense:size(3), in_dense:size(4), in_dense:size(5)
+  else 
+    error('invalid number of input dimensions')
+  end
+
+  -- local ind = in_dense:permute(1,3,4,5,2) -- move feature dim to end
+
+  -- local in_dense_oc = torch.Tensor():cuda()
+  -- in_dense_oc:resizeAs(ind):copy(ind)
+  
+  -- print(in_dense_oc:size())
+  local in_float = in_dense:clone():float()
+  local in_grid = oc.FloatOctree():octree_create_from_dense_features_batch_inverted(in_float, self.tr_dist):cuda() -- build valid octree
+  oc.gpu.cdhw_to_octree_avg_gpu(in_grid.grid, dense_depth, dense_height, dense_width, in_dense:data(), feature_size, self.output.grid)
+
+  return self.output
+end 
+
+function CDHWToOctreeByInput:updateGradInput(input, gradOutput)
+  local in_dense = input
+
+  local feature_size, dense_depth, dense_height, dense_width 
+  if in_dense:nDimension() == 4 then
+    feature_size, dense_depth, dense_height, dense_width = in_dense:size(1), in_dense:size(2), in_dense:size(3), in_dense:size(4)
+    in_dense = in_dense:view(1, feature_size, dense_depth, dense_height, dense_width)
+  elseif in_dense:nDimension() == 5 then
+    feature_size, dense_depth, dense_height, dense_width = in_dense:size(2), in_dense:size(3), in_dense:size(4), in_dense:size(5)
+  else 
+    error('invalid number of input dimensions')
+  end
+
+  self.gradInput:resizeAs(in_dense)
+
+  oc.gpu.cdhw_to_octree_avg_bwd_gpu(gradOutput.grid, dense_depth, dense_height, dense_width, self.tr_dist, self.gradInput:data())
+  return self.gradInput
+end
+

@@ -116,3 +116,55 @@ function OctreeConcatDS:updateGradInput(input, gradOutput)
   oc.gpu.octree_concat_ds_bwd_gpu(input[1].grid, input[2].grid, gradOutput.grid, self.do_grad_in2, self.gradInput[1].grid, self.gradInput[2].grid)
   return self.gradInput
 end
+
+local OctreeConcat3S1DS, parent = torch.class('oc.OctreeConcat3S1DS', 'oc.OctreeModule')
+
+function OctreeConcat3S1DS:__init(do_grad_in2)
+  parent.__init(self)
+
+  self.gradInput = {}
+end
+
+
+function OctreeConcat3S1DS:updateOutput(input)
+  if #input ~= 4 then
+    error("wrong input for concat")
+  end
+
+  local tmp1 = oc.FloatOctree():cuda()
+  local tmp2 = oc.FloatOctree():cuda()
+  oc.gpu.octree_concat_gpu(input[1].grid, input[2].grid, true, tmp1.grid) -- first two
+  oc.gpu.octree_concat_gpu(tmp1.grid, input[3].grid, true, tmp2.grid) -- middle two
+  oc.gpu.octree_concat_ds_gpu(tmp2.grid, input[4].grid, self.output.grid) -- last two
+
+  return self.output
+end 
+
+function OctreeConcat3S1DS:updateGradInput(input, gradOutput)
+  self.gradInput[1] = self.gradInput[1] or input[1]:new()
+  self.gradInput[2] = self.gradInput[2] or input[2]:new()
+  self.gradInput[3] = self.gradInput[3] or input[3]:new()
+  self.gradInput[4] = self.gradInput[4] or input[4]:new()
+
+  self.gradInput[1]:resizeAs(input[1])
+  self.gradInput[2]:resizeAs(input[2])
+  self.gradInput[3]:resizeAs(input[3])
+  self.gradInput[4]:resizeAs(input[4])
+
+
+  local tmp1 = oc.FloatOctree():cuda()
+  tmp1:resize(
+    input[3]:n(), input[3]:grid_depth(), input[3]:grid_height(),
+    input[3]:grid_width(), gradOutput:feature_size() - input[4]:feature_size(), input[3]:n_leafs())
+  
+  local tmp2 = oc.FloatOctree():cuda()
+  tmp2:resize(
+      input[2]:n(), input[2]:grid_depth(), input[2]:grid_height(),
+      input[2]:grid_width(), tmp1:feature_size() - input[3]:feature_size(), input[2]:n_leafs())
+
+  oc.gpu.octree_concat_ds_bwd_gpu(tmp1.grid, input[4].grid, gradOutput.grid, true, tmp1.grid, self.gradInput[4].grid)
+  oc.gpu.octree_concat_bwd_gpu(tmp2.grid, input[3].grid, tmp1.grid, true, tmp2.grid, self.gradInput[3].grid)
+  oc.gpu.octree_concat_bwd_gpu(input[1].grid, input[2].grid, tmp2.grid, true, self.gradInput[1].grid,  self.gradInput[2].grid)
+
+  return self.gradInput
+end

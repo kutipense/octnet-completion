@@ -291,7 +291,7 @@ __global__ void kernel_smooth_mae_loss_bwd(octree grad, int n_leafs, const octre
             ot_data_t y = ta_data[ta_data_idx + f];      
             const ot_data_t z = x - y;
             // ot_data_t grad;
-            if(z<=beta) 
+            if(z<=-beta) 
               grad.data[leaf_idx * grad.feature_size + f] = vol * norm * -1.0f;
             else if(z>=beta) 
               grad.data[leaf_idx * grad.feature_size + f] = vol * norm;

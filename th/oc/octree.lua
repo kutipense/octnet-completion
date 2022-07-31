@@ -183,6 +183,16 @@ function FloatOctree:octree_create_from_dense_features_batch(array, tr_dist)
   return grid
 end
 
+function FloatOctree:octree_create_from_dense_features_batch_inverted(array, tr_dist)
+  if array:nDimension() ~= 5 then
+    error('invalid tensor in create_from_dense_batch')
+  end
+
+  local grid = oc.FloatOctree()
+  grid.grid = oc_float_gc_wrapper( oc.cpu.octree_create_from_dense_features_batch_inverted_cpu(array:data(), array:size(1), array:size(3), array:size(4), array:size(5), array:size(2), tr_dist, false, 0, false, 1) )
+  return grid
+end
+
 function FloatOctree:equals(other, eps, debug)
   local eps = eps or 1e-4
   local deubg = debug or false

@@ -24,98 +24,82 @@ local function create_encoder_layer(in_f, out_f, negative_slope, bn, mp)
     return layer
 end
 
-local function create_decoder_layer(in_f, out_f, negative_slope, bn, mp)
-    local layer = nn.Sequential()
-        :add(oc.OctreeConvolutionMM(in_f, out_f))
-
-    if mp == true then
-        layer:add(oc.OctreeGridPool2x2x2('max'))
-    end
-
-    if bn == true then
-        layer:add(oc.OctreeBatchNormalizationSS(out_f))
-    end
-
-    layer:add(oc.OctreeLeakyReLU(negative_slope, true))
-    return layer
-end
 
 local function create_model(opt)
     local num_features = opt.num_features
     local negative_slope = opt.negative_slope
 
-    -- 32x32x32
-    conv1 = create_encoder_layer(2, num_features, negative_slope, false, true) -- 16x16x16 output
-    conv2 = create_encoder_layer(num_features, num_features * 2, negative_slope, true, true) -- 8x8x8 output
-    conv3 = create_encoder_layer(num_features * 2, num_features * 4, negative_slope, true, false) -- psuedo 4x4x4 (8x8x8 pre pool)
 
-    conv3_convert = nn.Sequential()
+    local vol = -nn.Identity() -- 32x32x32
+    local conv1 = create_encoder_layer(2, num_features, negative_slope, false, true) -- 16x16x16 output
+    local L1 = vol - conv1
+    
+    local conv2 = create_encoder_layer(num_features, num_features * 2, negative_slope, true, true) -- 8x8x8 output
+    local L2 = L1 - conv2
+
+    local conv3 = nn.Sequential()
         :add(oc.OctreeToCDHW(opt.tr_dist))
-        :add(cudnn.VolumetricConvolution(num_features * 4, num_features * 4, 3, 3, 3, 1, 1, 1, 1, 1, 1)) -- additional
-        :add(cudnn.VolumetricBatchNormalization(num_features * 4)):add(nn.LeakyReLU(negative_slope, true)) -- additional
+        :add(cudnn.VolumetricConvolution(num_features * 2, num_features * 4, 4, 4, 4, 2, 2, 2, 1, 1, 1)) -- 4x4x4
+        :add(cudnn.VolumetricBatchNormalization(num_features * 4)):add(nn.LeakyReLU(negative_slope, true))
+    local L3 = L2 - conv3
 
-    -- volumetric start 4x4x4x320
-    conv3_pool = nn.Sequential():add(cudnn.VolumetricMaxPooling(2, 2, 2, 2, 2, 2)) -- 4x4x4
-
-    conv4 = nn.Sequential()
-        :add(cudnn.VolumetricConvolution(num_features * 4, num_features * 8, 4, 4, 4)) -- 1x1x1
-        :add(cudnn.VolumetricBatchNormalization(num_features * 8)):add(nn.LeakyReLU(negative_slope, true))
-    -- 1x1x1
-    bottleneck = nn.Sequential()
-        :add(nn.Reshape(num_features * 8, true))
-        :add(nn.Linear(num_features * 8, num_features * 8)):add(nn.ReLU(true))
-        :add(nn.Linear(num_features * 8, num_features * 8)):add(nn.ReLU(true))
-        :add(nn.Reshape(num_features * 8, 1, 1, 1))
-    -- -- 1x1x1
-    deconv1 = nn.Sequential()
-        :add(cudnn.VolumetricFullConvolution(num_features * 16, num_features * 4, 4, 4, 4, 1, 1, 1, 0, 0, 0)) -- 4x4x4
-        :add(cudnn.VolumetricBatchNormalization(num_features * 4))
-        :add(cudnn.ReLU(true))
     -- 4x4x4
-    deconv2 = nn.Sequential()
+    local bottleneck = nn.Sequential()
+        :add(cudnn.VolumetricConvolution(num_features * 4, num_features * 4, 3, 3, 3, 1, 1, 1, 1, 1, 1)) -- 4x4x4
+        :add(cudnn.VolumetricBatchNormalization(num_features * 4)):add(nn.ReLU(true))
+        :add(cudnn.VolumetricConvolution(num_features * 4, num_features * 4, 3, 3, 3, 1, 1, 1, 1, 1, 1)) -- 4x4x4
+        :add(cudnn.VolumetricBatchNormalization(num_features * 4)):add(nn.ReLU(true))
+    local L4 = L3 - bottleneck
+    -- 4x4x4
+    
+    -- 4x4x4
+    local deconv1 = nn.Sequential()
         :add(cudnn.VolumetricFullConvolution(num_features * 8, num_features * 2, 4, 4, 4, 2, 2, 2, 1, 1, 1)) -- 8x8x8
         :add(cudnn.VolumetricBatchNormalization(num_features * 2))
         :add(cudnn.ReLU(true))
-    -- volumetric end 8x8x8x160
-
-    --8x8x8
-    deconv3 = nn.Sequential()
-        :add(cudnn.VolumetricConvolution(num_features * 6, num_features, 3, 3, 3, 1, 1, 1, 1, 1, 1)) -- 8x8x8
-        :add(cudnn.VolumetricBatchNormalization(num_features))
-        :add(cudnn.ReLU(true))
-
-    deconv3_convert = nn.Sequential()
         :add(oc.CDHWToOctreeByInput(opt.tr_dist))
-        :add(oc.OctreeConvolutionMM(num_features, num_features))
+    local L5 = nn.JoinTable(2)({ L4, L3 }) - deconv1
+
+    local deconv1_sig = L5 - oc.OctreeConvolutionMM(num_features*2, 1) - oc.OctreeSigmoid(false)
+    -- local deconv1_df = L5 - oc.OctreeConvolutionMM(num_features*2, 1) - oc.OctreeLogScale(false)
+
+    -- 8x8x8
+    local deconv2 = nn.Sequential()
+        :add(oc.OctreeConvolutionMM(num_features*4, num_features))
         :add(oc.OctreeBatchNormalizationSS(num_features))
         :add(oc.OctreeReLU(true))
-        :add(oc.OctreeGridUnpool2x2x2())
+        :add(oc.OctreeGridUnpool2x2x2()) -- 16x16x16
+    local L6 = oc.OctreeConcatDS()({ L5, L2 }) - deconv2
 
+    local tmp_sig1 = oc.OctreeSigmoid(false)
+    local deconv2_sig = L6 - oc.OctreeConvolutionMM(num_features, 1) - tmp_sig1
+    -- local deconv2_df = L6 - oc.OctreeConvolutionMM(num_features, 1) - oc.OctreeLogScale(false)
+  
     --16x16x16
-    deconv4 = nn.Sequential()
+    local deconv3 = nn.Sequential()
+        :add(oc.OctreeSplitByProb(tmp_sig1, 0.5, true))
         :add(oc.OctreeConvolutionMM(num_features*2, num_features))
         :add(oc.OctreeBatchNormalizationSS(num_features))
         :add(oc.OctreeReLU(true))
-        :add(oc.OctreeGridUnpool2x2x2())
-        :add(oc.OctreeConvolutionMM(num_features, 1))
-        :add(oc.OctreeLogScale(false))
+        :add(oc.OctreeGridUnpool2x2x2()) -- 32x32x32
+    local L7 = oc.OctreeConcatDS()({ L6, L1 }) - deconv3
+
+    local tmp_sig2 = oc.OctreeSigmoid(false)
+    local deconv3_sig =  L7 - oc.OctreeConvolutionMM(num_features, 1) - tmp_sig2
+    -- local deconv3_df = L7 - oc.OctreeConvolutionMM(num_features, 1) - oc.OctreeLogScale(false)
+
     --32x32x32
+    local deconv4 = nn.Sequential()
+        :add(oc.OctreeSplitByProb(tmp_sig2, 0.5, true))
+        :add(oc.OctreeConvolutionMM(num_features, num_features))
+        :add(oc.OctreeBatchNormalizationSS(num_features))
+        :add(oc.OctreeReLU(true))
+        :add(oc.OctreeConvolutionMM(num_features, 1))
+        -- :add(oc.OctreeLogScale(false))
+    local L8 = L7 - deconv4
 
-    local vol = -nn.Identity()
-    local L1 = vol - conv1
-    local L2 = L1 - conv2
-    local L3 = L2 - conv3 - conv3_convert
-    
-    local L3_pool = L3 - conv3_pool
-    local L4 = L3_pool - conv4
-    local L5 = L4 - bottleneck
-    local L6 = nn.JoinTable(2)({ L5, L4 }) - deconv1 --decoder entry
-    local L7 = nn.JoinTable(2)({ L6, L3_pool }) - deconv2
 
-    local L8 = nn.JoinTable(2)({ L7, L3 }) - deconv3 - deconv3_convert
-    local L9 = oc.OctreeConcatDS()({ L8, L1 }) - deconv4
-
-    model = nn.gModule({ vol }, { L9 })
+    model = nn.gModule({ vol }, { deconv1_sig, deconv2_sig, deconv3_sig, L8 })
     model = require('oc_weight_init')(model, 'xavier')
     model:cuda()
     return model
