@@ -151,7 +151,7 @@ function FloatOctree:create_from_dense(array, ranges)
   end
   
   local grid = oc.FloatOctree()
-  grid.grid = oc_float_gc_wrapper( oc.cpu.octree_create_from_dense_cpu(array:data(), array:size(1), array:size(2), array:size(3), ranges:size(1)/2, ranges:data(), false, 0, false, 1) )
+  grid.grid = oc_float_gc_wrapper( oc.cpu.octree_create_from_dense_cpu(array:data(), array:size(1), array:size(2), array:size(3), ranges:size(1)/2, ranges:data(), false, 0, false, 8) )
   return grid
 end
 
@@ -167,7 +167,7 @@ function FloatOctree:create_from_dense_batch(array, ranges)
   end
   
   local grid = oc.FloatOctree()
-  grid.grid = oc_float_gc_wrapper( oc.cpu.octree_create_from_dense_batch_cpu(array:data(), array:size(1), array:size(2), array:size(3), array:size(4), ranges:size(1)/2, ranges:data(), false, 0, false, 1) )
+  grid.grid = oc_float_gc_wrapper( oc.cpu.octree_create_from_dense_batch_cpu(array:data(), array:size(1), array:size(2), array:size(3), array:size(4), ranges:size(1)/2, ranges:data(), false, 0, false, 4) )
   return grid
 end
 
@@ -179,7 +179,7 @@ function FloatOctree:octree_create_from_dense_features_batch(array, tr_dist)
   end
   
   local grid = oc.FloatOctree()
-  grid.grid = oc_float_gc_wrapper( oc.cpu.octree_create_from_dense_features_batch_cpu(array:data(), array:size(1), array:size(2), array:size(3), array:size(4), array:size(5), tr_dist, false, 0, false, 1) )
+  grid.grid = oc_float_gc_wrapper( oc.cpu.octree_create_from_dense_features_batch_cpu(array:data(), array:size(1), array:size(2), array:size(3), array:size(4), array:size(5), tr_dist, false, 0, false, 4) )
   return grid
 end
 
@@ -189,7 +189,7 @@ function FloatOctree:octree_create_from_dense_features_batch_inverted(array, tr_
   end
 
   local grid = oc.FloatOctree()
-  grid.grid = oc_float_gc_wrapper( oc.cpu.octree_create_from_dense_features_batch_inverted_cpu(array:data(), array:size(1), array:size(3), array:size(4), array:size(5), array:size(2), tr_dist, false, 0, false, 1) )
+  grid.grid = oc_float_gc_wrapper( oc.cpu.octree_create_from_dense_features_batch_inverted_cpu(array:data(), array:size(1), array:size(3), array:size(4), array:size(5), array:size(2), tr_dist, false, 0, false, 4) )
   return grid
 end
 

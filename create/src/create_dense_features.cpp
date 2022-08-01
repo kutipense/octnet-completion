@@ -30,6 +30,10 @@
 #include <math.h>
 #include <iostream>
 
+#if defined(_OPENMP)
+#include <omp.h>
+#endif
+
 /// Create octrees from dense feature arrays, i.e. occupation is determined
 /// whether one of the features is different from zero and data is set to the features.
 /// @author David Stutz
@@ -139,6 +143,7 @@ extern "C"
 octree* octree_create_from_dense_features_batch_cpu(const ot_data_t* data, int batch_size, int depth, int height, int width, int feature_size, ot_data_t tr_dist, bool fit, int fit_multiply, bool pack, int n_threads) {
   // create individual octrees
   octree** octrees = new octree*[batch_size];
+  // #pragma omp parallel for
   for (int n = 0; n < batch_size; ++n) {
     int offset = depth * height * width * feature_size * n;
     octrees[n] = octree_create_from_dense_features_cpu(data + offset, depth, height, width, feature_size, tr_dist, fit, fit_multiply, pack, n_threads);
@@ -273,6 +278,8 @@ extern "C"
 octree* octree_create_from_dense_features_batch_inverted_cpu(const ot_data_t* data, int batch_size, int depth, int height, int width, int feature_size, ot_data_t tr_dist, bool fit, int fit_multiply, bool pack, int n_threads) {
   // create individual octrees
   octree** octrees = new octree*[batch_size];
+ 
+  #pragma omp parallel for
   for (int n = 0; n < batch_size; ++n) {
     int offset = depth * height * width * feature_size * n;
     octrees[n] = octree_create_from_dense_features_inverted_cpu(data + offset, depth, height, width, feature_size, tr_dist, fit, fit_multiply, pack, n_threads);
